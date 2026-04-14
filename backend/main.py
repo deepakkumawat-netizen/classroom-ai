@@ -1,0 +1,788 @@
+print("[DEBUG] main.py loading...")
+
+# Fix for Python 3.14 Windows asyncio issues
+import asyncio
+import sys
+if sys.platform == 'win32':
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+from openai import OpenAI
+from dotenv import load_dotenv
+import os
+import json
+from concurrent.futures import ThreadPoolExecutor
+from database import db
+from mcp_tools import get_chat_history, check_usage_limit, increment_usage
+
+print("[DEBUG] All imports complete")
+load_dotenv()
+print("[DEBUG] Creating FastAPI app...")
+
+app = FastAPI(title="ClassroomAI API")
+
+# Import RAG modules (available after pip install)
+try:
+    from rag_agent import RAGAgent
+    from code_analyzer import CodeAnalyzer
+    RAG_AVAILABLE = True
+except ImportError:
+    RAG_AVAILABLE = False
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+# ─── MODELS ───────────────────────────────────────────
+
+class WorksheetRequest(BaseModel):
+    topic: str
+    grade_level: str
+    subject: str = ""
+    worksheet_type: str = "mixed"
+    num_questions: int = 10
+    differentiation_level: str = "grade-level"   # grade-level | beginner | advanced | mixed
+    blooms_level: str = "mixed"                   # remember | understand | apply | analyze | evaluate | create | mixed
+    include_word_bank: bool = False
+    additional_instructions: str = ""
+
+class LessonPlanRequest(BaseModel):
+    topic: str
+    grade_level: str
+    subject: str
+    duration: str = "45 minutes"
+    objectives: str = ""
+    standards: str = ""
+    class_type: str = "in-person"      # in-person | remote | hybrid
+    learning_style: str = "mixed"      # mixed | visual | auditory | kinesthetic
+    student_needs: str = "general"     # general | ell | special_needs | gifted
+    tech_integration: str = "low"      # low | digital | interactive
+    include_topic_overview: bool = True
+    additional_notes: str = ""
+
+class MCAssessmentRequest(BaseModel):
+    topic: str
+    grade_level: str
+    subject: str = ""
+    num_questions: int = 10
+    difficulty: str = "medium"
+    blooms_level: str = "mixed"           # remember | understand | apply | analyze | evaluate | create | mixed
+    question_format: str = "pure_mc"      # pure_mc | mc_truefalse | mc_short
+    include_explanations: bool = True
+    standards: str = ""
+    additional_instructions: str = ""
+
+class AutoGenerateRequest(BaseModel):
+    topic: str
+    grade_level: str
+    subject: str
+    worksheet_type: str = "mixed"
+    mc_format: str = "pure_mc"
+    num_questions: int = 10
+
+# ─── RAG ENDPOINT MODELS ──────────────────────────────
+
+class CodeExplainRequest(BaseModel):
+    code: str
+    language: str
+    grade: str
+
+class DebugRequest(BaseModel):
+    code: str
+    language: str
+    error: str
+
+class ImproveRequest(BaseModel):
+    code: str
+    language: str
+    focus: str = "best_practices"
+
+class AnalyzeRequest(BaseModel):
+    code: str
+    language: str = "python"
+
+class PatternRequest(BaseModel):
+    pattern: str
+    language: str
+    grade: str
+
+# ─── CHAT HISTORY & USAGE MODELS ──────────────────────
+
+class ChatHistoryRequest(BaseModel):
+    teacher_id: str
+
+class UsageCheckRequest(BaseModel):
+    teacher_id: str
+    tool_name: str
+
+class UsageIncrementRequest(BaseModel):
+    teacher_id: str
+    tool_name: str
+
+class SaveChatRequest(BaseModel):
+    teacher_id: str
+    tool_name: str
+    topic: str
+    grade_level: str
+    subject: str
+    request_data: dict
+    response_preview: str
+    response_content: str = None  # Full response content
+
+# ─── HELPERS ──────────────────────────────────────────
+
+def get_grade_language_profile(grade_level: str) -> str:
+    g = grade_level.lower()
+    if any(x in g for x in ["kindergarten", "grade 1", "grade 2", "1st", "2nd", "k-"]):
+        return (
+            "LANGUAGE LEVEL — CRITICAL: Use extremely simple language. "
+            "Sentences must be 3-6 words maximum. Use only basic sight words a 5-6 year old knows. "
+            "No abstract concepts. Use animals, toys, food, family as examples only. "
+            "Every sentence must be something a Kindergartener can read aloud."
+        )
+    elif any(x in g for x in ["grade 3", "grade 4", "grade 5", "3rd", "4th", "5th"]):
+        return (
+            "LANGUAGE LEVEL: Use simple, clear elementary school language. "
+            "Sentences should be 8-12 words. Use common everyday vocabulary a 9-11 year old knows. "
+            "Include concrete, relatable real-world examples. Avoid jargon. "
+            "If introducing a new word, immediately define it in simple terms."
+        )
+    elif any(x in g for x in ["grade 6", "grade 7", "grade 8", "6th", "7th", "8th", "middle"]):
+        return (
+            "LANGUAGE LEVEL: Use middle school level language appropriate for ages 11-14. "
+            "Moderate sentence complexity is fine. Introduce subject-specific vocabulary "
+            "with brief definitions. Mix concrete examples with some abstract reasoning. "
+            "Students can handle multi-step thinking but need clear structure."
+        )
+    elif any(x in g for x in ["grade 9", "grade 10", "grade 11", "grade 12", "9th", "10th", "11th", "12th", "high school"]):
+        return (
+            "LANGUAGE LEVEL: Use high school academic language for ages 14-18. "
+            "Advanced vocabulary and complex sentence structures are expected. "
+            "Require abstract reasoning, critical analysis, and synthesis. "
+            "Use discipline-specific terminology without over-defining it. "
+            "Challenge students with nuanced questions and multi-layered concepts."
+        )
+    return "LANGUAGE LEVEL: Use clear, age-appropriate language for the specified grade level."
+
+
+def call_openai(system_prompt: str, user_prompt: str, max_tokens: int = 3500) -> str:
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user",   "content": user_prompt},
+            ],
+            temperature=0.65,
+            max_tokens=max_tokens,
+        )
+        return response.choices[0].message.content.strip()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"OpenAI API error: {str(e)}")
+
+# ─── ROUTES ───────────────────────────────────────────
+
+@app.get("/")
+def root():
+    return {"message": "ClassroomAI API is running!"}
+
+
+@app.post("/api/worksheet")
+def generate_worksheet(req: WorksheetRequest):
+    if not req.topic.strip():
+        raise HTTPException(status_code=400, detail="Topic is required.")
+
+    type_map = {
+        "fill_blank":      "fill-in-the-blank questions (use ________ for blanks)",
+        "multiple_choice": "multiple choice questions with 4 options each (A, B, C, D)",
+        "open_ended":      "open-ended short answer questions requiring critical thinking",
+        "mixed":           "a balanced mix of fill-in-the-blank, multiple choice, and open-ended questions",
+        "qa":              "question and answer pairs formatted as 'Q: [question]' then 'A: [answer]' on separate lines",
+    }
+
+    diff_map = {
+        "grade-level": "exactly at grade level using standard curriculum vocabulary",
+        "beginner":    "simplified and scaffolded for struggling or below-grade-level students using shorter sentences and simpler vocabulary",
+        "advanced":    "challenging for above-grade-level students requiring deeper analysis and extended thinking",
+        "mixed":       "differentiated with a range of difficulty from foundational to higher-order thinking to support all learners",
+    }
+
+    blooms_map = {
+        "remember":   "remembering and recalling facts (define, list, identify, name) — Bloom's Level 1",
+        "understand": "understanding and explaining concepts (describe, explain, summarize) — Bloom's Level 2",
+        "apply":      "applying knowledge to new situations (use, solve, demonstrate, calculate) — Bloom's Level 3",
+        "analyze":    "analyzing and breaking down information (compare, contrast, differentiate) — Bloom's Level 4",
+        "evaluate":   "evaluating and making judgments (assess, critique, justify, argue) — Bloom's Level 5",
+        "create":     "creating and synthesizing new ideas (design, compose, construct, formulate) — Bloom's Level 6",
+        "mixed":      "a balanced range across all Bloom's Taxonomy levels from recall to higher-order thinking",
+    }
+
+    q_type  = type_map.get(req.worksheet_type, type_map["mixed"])
+    diff    = diff_map.get(req.differentiation_level, diff_map["grade-level"])
+    blooms  = blooms_map.get(req.blooms_level, blooms_map["mixed"])
+
+    word_bank_note = ""
+    if req.include_word_bank and req.worksheet_type in ("fill_blank", "mixed"):
+        word_bank_note = (
+            "Include a WORD BANK box near the top of the worksheet listing all the missing words "
+            "students must use, arranged in a bordered box with words separated by commas."
+        )
+
+    system_prompt = (
+        "You are an expert classroom teacher and curriculum specialist with 20+ years of experience. "
+        "Create professional, print-ready worksheets that are engaging, pedagogically sound, and appropriately rigorous. "
+        "Ensure questions are clear, unambiguous, and aligned to the specified grade level and Bloom's level. "
+        "Write in plain text ONLY — absolutely no markdown, no asterisks, no hashtags, no bold symbols. "
+        "Use CAPITAL LETTERS for section headers and dashes for separators."
+    )
+
+    user_prompt = (
+        f"Create a complete, professional classroom worksheet for {req.grade_level} students.\n\n"
+        f"TOPIC: {req.topic}\n"
+        f"{'SUBJECT: ' + req.subject if req.subject else ''}\n"
+        f"QUESTION TYPE: {q_type}\n"
+        f"NUMBER OF QUESTIONS: {req.num_questions}\n"
+        f"DIFFERENTIATION LEVEL: {diff}\n"
+        f"BLOOM'S TAXONOMY FOCUS: {blooms}\n"
+        f"{word_bank_note}\n"
+        f"{'ADDITIONAL INSTRUCTIONS: ' + req.additional_instructions if req.additional_instructions else ''}\n\n"
+        "FORMAT REQUIREMENTS (plain text only, no markdown):\n"
+        "- Worksheet title in ALL CAPS\n"
+        "- Name / Date / Class lines\n"
+        f"{'- Word Bank box with all fill-in words listed' if req.include_word_bank else ''}\n"
+        "- Clear, brief instructions for students\n"
+        "- All questions numbered (1. 2. 3. ...)\n"
+        "- Adequate space for student responses\n"
+        "- ANSWER KEY section at bottom with answers numbered to match\n"
+        "- Include a one-sentence rationale for each answer in the key\n\n"
+        "Write ONLY plain text. No **, ##, or any markdown whatsoever."
+    )
+
+    result = call_openai(system_prompt, user_prompt)
+    return {"result": result, "tool": "worksheet"}
+
+
+@app.post("/api/lesson-plan")
+def generate_lesson_plan(req: LessonPlanRequest):
+    if not req.topic.strip():
+        raise HTTPException(status_code=400, detail="Topic is required.")
+
+    style_map = {
+        "mixed":       "a variety of learning modalities (visual, auditory, and kinesthetic activities combined)",
+        "visual":      "visual learning strategies — diagrams, charts, graphic organizers, color-coding, videos, visual aids",
+        "auditory":    "auditory learning strategies — discussion, verbal explanations, think-pair-share, reading aloud",
+        "kinesthetic": "kinesthetic and hands-on strategies — movement activities, manipulatives, experiments, role-play",
+    }
+
+    needs_map = {
+        "general":       "a general education classroom with diverse learners",
+        "ell":           "English Language Learners — include sentence frames, visual vocabulary, bilingual supports, and simplified instructions",
+        "special_needs": "students with diverse learning needs — include modifications, accommodations, chunked tasks, and extra scaffolding",
+        "gifted":        "gifted and talented students — include enrichment tasks, higher-order questioning, independent projects, and extensions",
+    }
+
+    tech_map = {
+        "low":         "low-tech environment — paper, pencil, physical manipulatives, whiteboards only",
+        "digital":     "digital tools — presentations, educational websites, online quizzes, Google Docs/Slides, video",
+        "interactive": "interactive/blended technology — interactive whiteboard, simulations, collaborative platforms, educational apps",
+    }
+
+    class_map = {
+        "in-person": "traditional in-person classroom",
+        "remote":    "fully remote/virtual classroom — include video call strategies, breakout rooms, digital submission methods",
+        "hybrid":    "hybrid classroom with both in-person and remote students simultaneously — address both audiences",
+    }
+
+    # Generate topic overview if requested
+    topic_overview = ""
+    if req.include_topic_overview:
+        topic_system = (
+            "You are a subject matter expert and experienced educator. "
+            "Provide comprehensive, authoritative, and student-friendly educational content about topics. "
+            "Make content accessible for the specified grade level while maintaining academic rigor. "
+            "Write in plain text ONLY — no markdown, no asterisks, no hashtags."
+        )
+
+        topic_prompt = (
+            f"Create a comprehensive topic overview for teacher reference:\n\n"
+            f"TOPIC: {req.topic}\n"
+            f"SUBJECT: {req.subject}\n"
+            f"GRADE LEVEL: {req.grade_level}\n\n"
+            "Include ALL sections with concise but detailed information:\n\n"
+            "1. OVERVIEW - What this topic is about and why it matters\n\n"
+            "2. KEY CONCEPTS - 5-7 core ideas with simple definitions\n\n"
+            "3. ESSENTIAL VOCABULARY - 8-10 key terms defined in student-friendly language\n\n"
+            "4. MAIN PRINCIPLES - 3-4 key ideas or rules about this topic\n\n"
+            "5. REAL-WORLD EXAMPLES - 3 concrete examples showing how this applies\n\n"
+            "6. INTERESTING FACTS - 3 fascinating or surprising facts\n\n"
+            "7. COMMON MISCONCEPTIONS - 2-3 things students often misunderstand with correct explanations\n\n"
+            f"Make all content age-appropriate for {req.grade_level}. "
+            "Write in plain text. No **, ##, or markdown."
+        )
+
+        topic_overview = call_openai(topic_system, topic_prompt, max_tokens=2500)
+        topic_overview = "=== PAGE 1: TOPIC OVERVIEW ===\n\n" + topic_overview + "\n\n" + "="*50 + "\n\n=== PAGE 2: LESSON PLAN ===\n\n"
+
+    system_prompt = (
+        "You are a master curriculum designer and instructional coach expert in UbD (Understanding by Design), "
+        "differentiated instruction, and modern pedagogical best practices. "
+        "Create detailed, actionable, classroom-ready lesson plans any teacher can pick up and use immediately. "
+        "Include specific timing estimates, concrete student activities, and teacher facilitation notes. "
+        "Write in plain text ONLY — no markdown, no asterisks, no hashtags. "
+        "Use numbered sections with UPPERCASE HEADERS."
+    )
+
+    user_prompt = (
+        f"Create a comprehensive, fully detailed lesson plan:\n\n"
+        f"TOPIC: {req.topic}\n"
+        f"SUBJECT: {req.subject}\n"
+        f"GRADE LEVEL: {req.grade_level}\n"
+        f"DURATION: {req.duration}\n"
+        f"CLASS FORMAT: {class_map.get(req.class_type, class_map['in-person'])}\n"
+        f"LEARNING STYLE FOCUS: {style_map.get(req.learning_style, style_map['mixed'])}\n"
+        f"STUDENT NEEDS: {needs_map.get(req.student_needs, needs_map['general'])}\n"
+        f"TECHNOLOGY: {tech_map.get(req.tech_integration, tech_map['low'])}\n"
+        f"{'LEARNING OBJECTIVES: ' + req.objectives if req.objectives else ''}\n"
+        f"{'STANDARDS: ' + req.standards if req.standards else ''}\n"
+        f"{'ADDITIONAL NOTES: ' + req.additional_notes if req.additional_notes else ''}\n\n"
+        "Include ALL sections below with detailed, specific content:\n\n"
+        "1. LESSON OVERVIEW\n"
+        "   - Lesson summary (2-3 sentences)\n"
+        "   - Essential question students will explore\n"
+        "   - Learning objectives in SWBAT format (Students Will Be Able To...)\n"
+        "   - Success criteria (what mastery looks like)\n\n"
+        "2. MATERIALS AND RESOURCES\n"
+        "   - All materials with quantities\n"
+        "   - Technology or tools required\n"
+        "   - Teacher preparation steps\n\n"
+        "3. WARM-UP / HOOK (with time estimate)\n"
+        "   - Engaging activity to activate prior knowledge\n"
+        "   - Real-world connection or student interest hook\n"
+        "   - Key discussion questions to ask\n\n"
+        "4. DIRECT INSTRUCTION (with time estimate)\n"
+        "   - Step-by-step teaching sequence\n"
+        "   - Key vocabulary with simple definitions\n"
+        "   - Teacher talking points and examples\n"
+        "   - Checks for understanding during instruction\n\n"
+        "5. GUIDED PRACTICE (with time estimate)\n"
+        "   - Whole-class or small group activity description\n"
+        "   - Student grouping suggestions\n"
+        "   - Teacher facilitation notes\n\n"
+        "6. INDEPENDENT PRACTICE (with time estimate)\n"
+        "   - Individual student task\n"
+        "   - What teacher observes and monitors\n\n"
+        "7. CLOSURE AND FORMATIVE ASSESSMENT\n"
+        "   - Exit ticket or closing activity\n"
+        "   - How teacher assesses understanding before next lesson\n\n"
+        "8. DIFFERENTIATION STRATEGIES\n"
+        "   - Modifications for struggling learners\n"
+        "   - Extensions for advanced students\n"
+        f"   - Specific accommodations for: {needs_map.get(req.student_needs, 'all learners')}\n\n"
+        "9. HOMEWORK / EXTENSION (if applicable)\n\n"
+        "10. TEACHER REFLECTION NOTES\n"
+        "    - Potential challenges and how to address them\n"
+        "    - What to look for during the lesson\n"
+        "    - Ideas for the follow-up lesson\n\n"
+        "Write everything in plain text. No **, ##, or markdown formatting of any kind."
+    )
+
+    lesson_result = call_openai(system_prompt, user_prompt, max_tokens=4000)
+    result = topic_overview + lesson_result
+    return {"result": result, "tool": "lesson-plan"}
+
+
+@app.post("/api/mc-assessment")
+def generate_mc_assessment(req: MCAssessmentRequest):
+    if not req.topic.strip():
+        raise HTTPException(status_code=400, detail="Topic is required.")
+
+    blooms_map = {
+        "remember":   "recall and recognition (define, identify, name, list) — Bloom's Level 1",
+        "understand": "comprehension (explain, describe, summarize, classify) — Bloom's Level 2",
+        "apply":      "application (use, solve, demonstrate, calculate) — Bloom's Level 3",
+        "analyze":    "analysis (compare, contrast, examine, differentiate) — Bloom's Level 4",
+        "evaluate":   "evaluation (assess, critique, justify, recommend) — Bloom's Level 5",
+        "create":     "synthesis/creation (design, formulate, propose, construct) — Bloom's Level 6",
+        "mixed":      "a deliberate mix across all Bloom's Taxonomy levels (recall through synthesis)",
+    }
+
+    mc_count = max(1, int(req.num_questions * 0.7))
+    other_count = req.num_questions - mc_count
+
+    format_map = {
+        "pure_mc":      f"all {req.num_questions} questions as standard multiple choice (4 options: A, B, C, D)",
+        "mc_truefalse": f"{mc_count} multiple choice questions (4 options A-D) followed by {other_count} True/False questions, clearly labeled by section",
+        "mc_short":     f"{mc_count} multiple choice questions (4 options A-D) followed by {other_count} short answer questions requiring 1-2 sentence responses",
+    }
+
+    diff_desc = {
+        "easy":   "straightforward recall and basic comprehension — accessible to most students",
+        "medium": "moderate application and analysis — requires solid understanding of core concepts",
+        "hard":   "challenging evaluation and synthesis — requires deep mastery and critical thinking",
+        "mixed":  "a range from basic recall to challenging analysis across difficulty levels",
+    }
+
+    answer_key_note = (
+        "In the ANSWER KEY, for each question provide: the correct answer letter AND a 1-2 sentence explanation of "
+        "why it is correct and what common misconception the wrong options address."
+        if req.include_explanations else
+        "In the ANSWER KEY, list only the question number and correct answer letter."
+    )
+
+    system_prompt = (
+        "You are an expert assessment designer with deep knowledge of curriculum standards, "
+        "Bloom's Taxonomy, and best practices in test construction. "
+        "Create high-quality, fair, and valid assessments. "
+        "All distractors (wrong answers) must be plausible but clearly incorrect to students who mastered the material. "
+        "Avoid trick questions, double negatives, and 'all of the above' options. "
+        "Write in plain text ONLY — no markdown, no asterisks, no hashtags."
+    )
+
+    user_prompt = (
+        f"Create a {req.num_questions}-question assessment on: '{req.topic}'\n\n"
+        f"GRADE LEVEL: {req.grade_level}\n"
+        f"{'SUBJECT: ' + req.subject if req.subject else ''}\n"
+        f"DIFFICULTY: {diff_desc.get(req.difficulty, diff_desc['medium'])}\n"
+        f"BLOOM'S TAXONOMY FOCUS: {blooms_map.get(req.blooms_level, blooms_map['mixed'])}\n"
+        f"QUESTION FORMAT: {format_map.get(req.question_format, format_map['pure_mc'])}\n"
+        f"{'STANDARDS: ' + req.standards if req.standards else ''}\n"
+        f"{'ADDITIONAL INSTRUCTIONS: ' + req.additional_instructions if req.additional_instructions else ''}\n\n"
+        "FORMAT REQUIREMENTS (plain text only):\n"
+        "- Assessment title in ALL CAPS\n"
+        "- Name / Date / Score fields\n"
+        "- Brief student instructions\n"
+        "- All questions numbered consecutively\n"
+        "- Options clearly labeled A, B, C, D for MC questions\n"
+        "- True / False clearly labeled for T/F questions\n"
+        "- Writing lines for short answer questions\n\n"
+        f"ANSWER KEY: {answer_key_note}\n\n"
+        "Write everything in plain text. No **, ##, or any markdown."
+    )
+
+    result = call_openai(system_prompt, user_prompt, max_tokens=3500)
+    return {"result": result, "tool": "mc-assessment"}
+
+
+@app.post("/api/auto-generate")
+def auto_generate(req: AutoGenerateRequest):
+    if not req.topic.strip():
+        raise HTTPException(status_code=400, detail="Topic is required.")
+    if not req.grade_level.strip():
+        raise HTTPException(status_code=400, detail="Grade level is required.")
+    if not req.subject.strip():
+        raise HTTPException(status_code=400, detail="Subject is required.")
+
+    lang = get_grade_language_profile(req.grade_level)
+
+    # ── Worksheet ──────────────────────────────────────
+    type_map = {
+        "fill_blank":      "fill-in-the-blank questions (use ________ for blanks)",
+        "multiple_choice": "multiple choice questions with 4 options each (A, B, C, D)",
+        "open_ended":      "open-ended short answer questions requiring critical thinking",
+        "mixed":           "a balanced mix of fill-in-the-blank, multiple choice, and open-ended questions",
+        "qa":              "question and answer pairs formatted as 'Q: [question]' then 'A: [answer]' on separate lines",
+    }
+    ws_system = (
+        f"You are an expert classroom teacher creating a worksheet for {req.grade_level} students. "
+        f"{lang} "
+        "Write in plain text ONLY — no markdown, no asterisks, no hashtags. "
+        "Use CAPITAL LETTERS for section headers."
+    )
+    ws_user = (
+        f"Create a complete classroom worksheet for {req.grade_level} students.\n\n"
+        f"TOPIC: {req.topic}\nSUBJECT: {req.subject}\n"
+        f"QUESTION TYPE: {type_map.get(req.worksheet_type, type_map['mixed'])}\n"
+        f"NUMBER OF QUESTIONS: {req.num_questions}\n\n"
+        "Include: worksheet title in ALL CAPS, Name/Date/Class lines, student instructions, "
+        "numbered questions, and an ANSWER KEY at the bottom with rationales.\n"
+        "Plain text only. No **, ##, or any markdown."
+    )
+
+    # ── Topic Overview (Page 1 — teacher reference) ────
+    ov_system = (
+        f"You are a subject matter expert and experienced educator writing a teacher reference guide. "
+        f"{lang} "
+        "Write in plain text ONLY — no markdown, no asterisks, no hashtags."
+    )
+    ov_user = (
+        f"Create a comprehensive topic overview for teacher reference:\n\n"
+        f"TOPIC: {req.topic}\nSUBJECT: {req.subject}\nGRADE LEVEL: {req.grade_level}\n\n"
+        "Include ALL sections below with concise but detailed content:\n\n"
+        "1. OVERVIEW - What this topic is and why it matters at this grade level\n\n"
+        "2. KEY CONCEPTS - 5-7 core ideas with simple definitions appropriate for the grade\n\n"
+        "3. ESSENTIAL VOCABULARY - 8-10 key terms defined in student-friendly language\n\n"
+        "4. MAIN PRINCIPLES - 3-4 key rules or ideas about this topic\n\n"
+        "5. REAL-WORLD EXAMPLES - 3 concrete examples showing how this applies in daily life\n\n"
+        "6. INTERESTING FACTS - 3 fascinating or surprising facts to engage students\n\n"
+        "7. COMMON MISCONCEPTIONS - 2-3 things students often misunderstand with correct explanations\n\n"
+        f"Write everything at the correct complexity for {req.grade_level} students. "
+        "Plain text only. No **, ##, or any markdown."
+    )
+
+    # ── Lesson Plan (Page 2 — teaching instructions) ───
+    lp_system = (
+        f"You are a master curriculum designer creating a lesson plan for {req.grade_level} students. "
+        f"{lang} "
+        "Write in plain text ONLY — no markdown, no asterisks. "
+        "Use numbered sections with UPPERCASE HEADERS."
+    )
+    lp_user = (
+        f"Create a complete 45-minute lesson plan:\n\n"
+        f"TOPIC: {req.topic}\nSUBJECT: {req.subject}\nGRADE LEVEL: {req.grade_level}\n\n"
+        "Include: 1. LESSON OVERVIEW (objectives in SWBAT format, essential question, success criteria) "
+        "2. MATERIALS AND RESOURCES 3. WARM-UP/HOOK (10 min) 4. DIRECT INSTRUCTION (15 min) "
+        "5. GUIDED PRACTICE (10 min) 6. INDEPENDENT PRACTICE (7 min) "
+        "7. CLOSURE & FORMATIVE ASSESSMENT (3 min) 8. DIFFERENTIATION STRATEGIES "
+        "(modifications for struggling learners, extensions for advanced students).\n"
+        "Plain text only. No **, ##, or any markdown."
+    )
+
+    # ── MC Assessment ──────────────────────────────────
+    mc_count = max(1, int(req.num_questions * 0.7))
+    other_count = req.num_questions - mc_count
+    format_map = {
+        "pure_mc":      f"all {req.num_questions} standard multiple choice questions (4 options: A, B, C, D)",
+        "mc_truefalse": f"{mc_count} multiple choice (A-D) followed by {other_count} True/False questions",
+        "mc_short":     f"{mc_count} multiple choice (A-D) followed by {other_count} short answer questions",
+    }
+    mc_system = (
+        f"You are an expert assessment designer creating a quiz for {req.grade_level} students. "
+        f"{lang} "
+        "Write in plain text ONLY — no markdown, no asterisks. "
+        "All wrong answer choices must be plausible but clearly incorrect to students who studied."
+    )
+    mc_user = (
+        f"Create a {req.num_questions}-question assessment:\n\n"
+        f"TOPIC: {req.topic}\nSUBJECT: {req.subject}\nGRADE LEVEL: {req.grade_level}\n"
+        f"FORMAT: {format_map.get(req.mc_format, format_map['pure_mc'])}\n\n"
+        "Include: title in ALL CAPS, Name/Date/Score fields, student instructions, "
+        "numbered questions, and ANSWER KEY with one-sentence explanations per answer.\n"
+        "Plain text only. No **, ##, or any markdown."
+    )
+
+    # ── Run all 4 in parallel ──────────────────────────
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        f_ov = pool.submit(call_openai, ov_system, ov_user, 2500)
+        f_lp = pool.submit(call_openai, lp_system, lp_user, 3500)
+        f_ws = pool.submit(call_openai, ws_system, ws_user, 2500)
+        f_mc = pool.submit(call_openai, mc_system, mc_user, 2500)
+        topic_overview = f_ov.result()
+        lesson_content = f_lp.result()
+        worksheet      = f_ws.result()
+        mc_assessment  = f_mc.result()
+
+    # Combine overview + lesson plan (matching the Lesson Plan Generator format)
+    lesson_plan = (
+        "=== PAGE 1: TOPIC OVERVIEW (TEACHER REFERENCE) ===\n\n"
+        + topic_overview
+        + "\n\n" + "=" * 50 + "\n\n"
+        + "=== PAGE 2: LESSON PLAN ===\n\n"
+        + lesson_content
+    )
+
+    return {
+        "worksheet":     worksheet,
+        "lesson_plan":   lesson_plan,
+        "mc_assessment": mc_assessment,
+        "grade_profile": lang,
+        "tool": "auto-generate",
+    }
+
+
+# ─── RAG ENDPOINTS (ADVANCED FEATURES) ─────────────────
+
+@app.post("/api/advanced/explain")
+async def explain_advanced(request: CodeExplainRequest):
+    """Explain advanced code with RAG-retrieved knowledge base"""
+    if not RAG_AVAILABLE:
+        raise HTTPException(status_code=503, detail="RAG system not available")
+
+    try:
+        agent = RAGAgent()
+        explanation = agent.explain_code(request.code, request.language, request.grade)
+        return {"explanation": explanation, "tool": "explain-code"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/advanced/debug")
+async def debug_code(request: DebugRequest):
+    """Debug code using pattern matching from knowledge base"""
+    if not RAG_AVAILABLE:
+        raise HTTPException(status_code=503, detail="RAG system not available")
+
+    try:
+        agent = RAGAgent()
+        solution = agent.debug_code(request.code, request.language, request.error)
+        return {"solution": solution, "tool": "debug-code"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/advanced/improve")
+async def improve_code(request: ImproveRequest):
+    """Suggest code improvements based on best practices"""
+    if not RAG_AVAILABLE:
+        raise HTTPException(status_code=503, detail="RAG system not available")
+
+    try:
+        agent = RAGAgent()
+        improvements = agent.suggest_improvements(request.code, request.language, request.focus)
+        return {"improvements": improvements, "tool": "improve-code"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/advanced/analyze")
+async def analyze_code(request: AnalyzeRequest):
+    """Analyze code structure, complexity, and best practice violations"""
+    if not RAG_AVAILABLE:
+        raise HTTPException(status_code=503, detail="RAG system not available")
+
+    try:
+        analyzer = CodeAnalyzer()
+        if request.language == "python":
+            analysis = analyzer.analyze_python(request.code)
+        elif request.language == "javascript":
+            analysis = analyzer.analyze_javascript(request.code)
+        else:
+            raise HTTPException(status_code=400, detail=f"Language {request.language} not supported")
+
+        return {
+            "analysis": analysis,
+            "tool": "analyze-code"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/advanced/teach-pattern")
+async def teach_pattern(request: PatternRequest):
+    """Teach design pattern with code examples"""
+    if not RAG_AVAILABLE:
+        raise HTTPException(status_code=503, detail="RAG system not available")
+
+    try:
+        agent = RAGAgent()
+        explanation = agent.teach_pattern(request.pattern, request.language, request.grade)
+        return {"explanation": explanation, "tool": "teach-pattern"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ─── CHAT HISTORY & USAGE ENDPOINTS ───────────────────
+
+print("[STARTUP] Loading chat history & usage endpoints...")
+
+@app.post("/api/chat-history")
+async def get_chat_history_endpoint(request: ChatHistoryRequest):
+    """Get last 7 chats for a teacher"""
+    try:
+        result = get_chat_history(request.teacher_id)
+        return result
+    except Exception as e:
+        print(f"❌ Error getting chat history: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/check-usage")
+async def check_usage_endpoint(request: UsageCheckRequest):
+    """Check daily usage limit for a tool"""
+    try:
+        result = db.get_usage(request.teacher_id, request.tool_name)
+        return result
+    except Exception as e:
+        print(f"❌ Error checking usage: {e}")
+        import traceback
+        traceback.print_exc()
+        return {
+            "usage_count": 0,
+            "limit": 50,
+            "remaining": 50,
+            "exceeded": False
+        }
+
+@app.post("/api/increment-usage")
+async def increment_usage_endpoint(request: UsageIncrementRequest):
+    """Increment usage count and check if limit exceeded"""
+    try:
+        result = increment_usage(request.teacher_id, request.tool_name)
+
+        # If limit exceeded, return 429 (Too Many Requests) but still return the data
+        if result['exceeded']:
+            return result  # Frontend handles the error display
+
+        return result
+    except Exception as e:
+        print(f"❌ Error incrementing usage: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/save-chat")
+async def save_chat_endpoint(request: SaveChatRequest):
+    """Save a chat to history"""
+    try:
+        chat_id = db.save_chat(
+            request.teacher_id,
+            request.tool_name,
+            request.topic,
+            request.grade_level,
+            request.subject,
+            request.request_data,
+            request.response_preview,
+            request.response_content
+        )
+
+        return {
+            "success": True,
+            "chat_id": chat_id,
+            "message": "Chat saved to history"
+        }
+    except Exception as e:
+        print(f"❌ Error saving chat: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+if __name__ == "__main__":
+    import uvicorn
+    import socket
+
+    # Configure socket to allow reuse (fixes TIME_WAIT port binding issues on Windows)
+    class SocketReusableServer(uvicorn.Server):
+        def install_signal_handlers(self):
+            pass
+
+    # Create uvicorn config with socket reuse enabled
+    config = uvicorn.Config(
+        app,
+        host="127.0.0.1",
+        port=8001,
+        log_level="info"
+    )
+
+    # Allow address reuse to fix "port already in use" errors
+    config.disable_lifespan = False
+
+    server = uvicorn.Server(config)
+
+    # Patch socket to allow reuse
+    original_socket = socket.socket
+    def patched_socket(*args, **kwargs):
+        sock = original_socket(*args, **kwargs)
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        if hasattr(socket, 'SO_REUSEPORT'):
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
+        return sock
+    socket.socket = patched_socket
+
+    try:
+        import asyncio
+        asyncio.run(server.serve())
+    except KeyboardInterrupt:
+        pass
