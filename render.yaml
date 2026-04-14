@@ -1,0 +1,29 @@
+services:
+  # Backend API Service
+  - type: web
+    name: classroom-ai-backend
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: python main.py
+    envVars:
+      - key: OPENAI_API_KEY
+        scope: build,runtime
+        sync: false
+      - key: PORT
+        value: "8001"
+    port: 8001
+    autoDeploy: true
+
+  # Frontend Service
+  - type: web
+    name: classroom-ai-frontend
+    runtime: node
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    startCommand: npm run preview
+    envVars:
+      - key: VITE_API_URL
+        value: https://classroom-ai-backend.onrender.com
+    port: 3004
+    autoDeploy: true
