@@ -10,9 +10,6 @@ services:
       - key: OPENAI_API_KEY
         scope: build,runtime
         sync: false
-      - key: PORT
-        value: "8001"
-    port: 8001
     autoDeploy: true
 
   # Frontend Service
@@ -25,5 +22,4 @@ services:
     envVars:
       - key: VITE_API_URL
         value: https://classroom-ai-backend.onrender.com
-    port: 3004
     autoDeploy: true
