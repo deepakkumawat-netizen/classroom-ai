@@ -1,9 +1,10 @@
-import React, { useState, useRef } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import OutputBox from '../components/OutputBox'
 import ChatHistory from '../components/ChatHistory'
 import UsageCounter from '../components/UsageCounter'
 import ErrorToast from '../components/ErrorToast'
-import { useState as useStateAlias, useRef as useRefAlias, useEffect as useEffectAlias } from 'react'
+import AdaptiveProgressTracker from '../components/AdaptiveProgressTracker'
+import RecommendationPanel from '../components/RecommendationPanel'
 
 function DownDropdown({ value, onChange, options, placeholder, active }) {
   const [open, setOpen] = React.useState(false)
@@ -71,8 +72,9 @@ function DownDropdown({ value, onChange, options, placeholder, active }) {
   )
 }
 
-const API = 'http://localhost:8001'
+const API = 'http://localhost:5000'
 const TEACHER_ID = 'teacher-demo-123'
+const STUDENT_ID = 'student-' + (Math.random().toString(36).substring(7))
 
 const TOPIC_SUGGESTIONS = {
   'Math': {
@@ -726,6 +728,12 @@ export default function AutoGenerator() {
         </div>
       )}
 
+      {/* ── Adaptive Learning Components ────────────────────────────────── */}
+      <div style={{ padding: '0 0 16px 0' }}>
+        <AdaptiveProgressTracker studentId={STUDENT_ID} teacherId={TEACHER_ID} />
+        <RecommendationPanel studentId={STUDENT_ID} teacherId={TEACHER_ID} />
+      </div>
+
       {/* ── Output Tabs ────────────────────────────────── */}
       {hasResults && (
         <div className="fade-up">
@@ -772,10 +780,6 @@ export default function AutoGenerator() {
         </div>
       )}
 
-      {/* Usage Counter */}
-      <div style={{ marginTop: 24, marginBottom: 24 }}>
-        <UsageCounter teacherId={TEACHER_ID} toolName="auto-generate" onLimitExceeded={setLimitError} />
-      </div>
       </div>
 
       {/* Chat History Sidebar */}

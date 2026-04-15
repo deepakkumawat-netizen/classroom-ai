@@ -1,13 +1,16 @@
-import React, { useState, useRef } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import OutputBox from '../components/OutputBox'
 import CustomSelect from '../components/CustomSelect'
 import ChatHistory from '../components/ChatHistory'
 import UsageCounter from '../components/UsageCounter'
 import ErrorToast from '../components/ErrorToast'
+import AdaptiveProgressTracker from '../components/AdaptiveProgressTracker'
+import RecommendationPanel from '../components/RecommendationPanel'
 
-const API = 'http://localhost:8001'
+const API = 'http://localhost:5000'
 const STORAGE_KEY = 'classroom-result-worksheet'
 const TEACHER_ID = 'teacher-demo-123'
+const STUDENT_ID = 'student-' + (Math.random().toString(36).substring(7))
 
 const grades   = ['Kindergarten','Grade 1','Grade 2','Grade 3','Grade 4','Grade 5','Grade 6','Grade 7','Grade 8','Grade 9','Grade 10','Grade 11','Grade 12']
 const subjects = ['Mathematics','Science','English Language Arts','Social Studies','History','Geography','Physics','Chemistry','Biology','Computer Science','Art','Music','Physical Education','Foreign Language','Other']
@@ -187,7 +190,37 @@ export default function WorksheetGenerator() {
   const [errors, setErrors]   = useState({})
   const [showHistory, setShowHistory] = useState(false)
   const [limitError, setLimitError] = useState(null)
+  const [adaptiveDifficulty, setAdaptiveDifficulty] = useState(0.5)
+  const [showAdaptive, setShowAdaptive] = useState(false)
   const usageCounterRef = useRef(null)
+
+  // Register student with adaptive learning system on mount
+  useEffect(() => {
+    if (form.subject && form.grade_level) {
+      registerStudent()
+    }
+  }, [form.subject, form.grade_level])
+
+  const registerStudent = async () => {
+    try {
+      await fetch(`${API}/api/adaptive/submit-answer`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          student_id: STUDENT_ID,
+          teacher_id: TEACHER_ID,
+          topic: form.topic || 'Worksheet',
+          question_id: 0,
+          answer: 'registered',
+          is_correct: true,
+          time_taken: 0,
+          difficulty_rating: 0.5
+        })
+      }).catch(() => {}) // Silent fail if adaptive system not available
+    } catch (e) {
+      console.log('Adaptive tracking not available')
+    }
+  }
 
   const set = (k, v) => { setForm(f => ({ ...f, [k]: v })); setErrors(e => ({ ...e, [k]: '' })) }
 
@@ -223,11 +256,29 @@ export default function WorksheetGenerator() {
       console.error('Error checking usage:', e)
     }
 
+    // Get adaptive difficulty
+    try {
+      const diffRes = await fetch(`${API}/api/adaptive/student-progress`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ student_id: STUDENT_ID })
+      })
+      if (diffRes.ok) {
+        const diffData = await diffRes.json()
+        setAdaptiveDifficulty(diffData.progress?.overall_mastery || 0.5)
+      }
+    } catch (e) {
+      console.log('Adaptive difficulty not available')
+    }
+
     setLoading(true); saveResult('')
     try {
       const res  = await fetch(`${API}/api/worksheet`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
+        body: JSON.stringify({
+          ...form,
+          adaptive_difficulty: adaptiveDifficulty // Include adaptive difficulty for content generation
+        }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.detail || 'Error')
@@ -237,6 +288,21 @@ export default function WorksheetGenerator() {
       if (usageCounterRef.current) {
         usageCounterRef.current.refresh()
       }
+
+      // Track generation with adaptive system
+      fetch(`${API}/api/adaptive/submit-answer`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          student_id: STUDENT_ID,
+          question_id: 1,
+          teacher_id: TEACHER_ID,
+          answer: 'worksheet_generated',
+          is_correct: true,
+          time_taken: 0,
+          difficulty_rating: adaptiveDifficulty
+        })
+      }).catch(() => {})
 
       // Save to chat history
       fetch(`${API}/api/save-chat`, {
@@ -290,7 +356,6 @@ export default function WorksheetGenerator() {
               📋 History
             </button>
           </div>
-          <UsageCounter teacherId={TEACHER_ID} toolName="worksheet" />
         </div>
 
         <div style={FORM_BODY}>
@@ -416,7 +481,14 @@ export default function WorksheetGenerator() {
       </div>
 
       {/* ── RIGHT PANEL ── */}
-      <div style={{ height: PAGE_H, display: 'flex', flexDirection: 'column' }} className="fade-up-1">
+      <div style={{ height: PAGE_H, display: 'flex', flexDirection: 'column', overflow: 'auto' }} className="fade-up-1">
+        {/* Adaptive Learning Components */}
+        <div style={{ padding: '0 0 16px 0' }}>
+          <AdaptiveProgressTracker studentId={STUDENT_ID} teacherId={TEACHER_ID} />
+          <RecommendationPanel studentId={STUDENT_ID} teacherId={TEACHER_ID} />
+        </div>
+
+        {/* Output Box */}
         <OutputBox result={result} loading={loading} toolName="worksheet" onClear={clearResult}
           icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>}
         />

@@ -1,13 +1,16 @@
-import React, { useState, useRef } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import OutputBox from '../components/OutputBox'
 import CustomSelect from '../components/CustomSelect'
 import ChatHistory from '../components/ChatHistory'
 import UsageCounter from '../components/UsageCounter'
 import ErrorToast from '../components/ErrorToast'
+import AdaptiveProgressTracker from '../components/AdaptiveProgressTracker'
+import RecommendationPanel from '../components/RecommendationPanel'
 
-const API = 'http://localhost:8001'
+const API = 'http://localhost:5000'
 const STORAGE_KEY = 'classroom-result-lesson'
 const TEACHER_ID = 'teacher-demo-123'
+const STUDENT_ID = 'student-' + (Math.random().toString(36).substring(7))
 
 const grades    = ['Kindergarten','Grade 1','Grade 2','Grade 3','Grade 4','Grade 5','Grade 6','Grade 7','Grade 8','Grade 9','Grade 10','Grade 11','Grade 12','College']
 
@@ -446,11 +449,17 @@ export default function LessonPlanGenerator() {
       </div>
 
       {/* ── RIGHT PANEL ── */}
-      <div style={{ height: PAGE_H, display: 'flex', flexDirection: 'column', gap: 16 }} className="fade-up-1">
+      <div style={{ height: PAGE_H, display: 'flex', flexDirection: 'column', overflow: 'auto' }} className="fade-up-1">
+        {/* Adaptive Learning Components */}
+        <div style={{ padding: '0 0 16px 0' }}>
+          <AdaptiveProgressTracker studentId={STUDENT_ID} teacherId={TEACHER_ID} />
+          <RecommendationPanel studentId={STUDENT_ID} teacherId={TEACHER_ID} />
+        </div>
+
+        {/* Output Box */}
         <OutputBox result={result} loading={loading} toolName="lesson plan" onClear={clearResult}
           icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>}
         />
-        <UsageCounter teacherId={TEACHER_ID} toolName="lesson-plan" onLimitExceeded={setLimitError} />
       </div>
     </div>
 

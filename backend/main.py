@@ -749,6 +749,271 @@ async def save_chat_endpoint(request: SaveChatRequest):
         print(f"❌ Error saving chat: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+# ─── ADAPTIVE LEARNING ENDPOINTS ───────────────────────
+
+class AdaptiveAssessmentRequest(BaseModel):
+    student_id: str
+    question_id: int
+    teacher_id: str
+    answer: str
+    is_correct: bool
+    time_taken: float
+    difficulty_rating: float
+
+@app.post("/api/adaptive/submit-answer")
+async def submit_answer(request: AdaptiveAssessmentRequest):
+    """Record student answer and update adaptive learning models"""
+    try:
+        assessment_id = db.record_assessment(
+            student_id=request.student_id,
+            question_id=request.question_id,
+            teacher_id=request.teacher_id,
+            answer=request.answer,
+            is_correct=request.is_correct,
+            time_taken=request.time_taken,
+            difficulty_rating=request.difficulty_rating
+        )
+
+        return {
+            "success": True,
+            "assessment_id": assessment_id
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/adaptive/student-progress")
+async def get_student_progress(data: dict):
+    """Get student's current learning progress"""
+    try:
+        student_id = data.get("student_id")
+        if not student_id:
+            raise HTTPException(status_code=400, detail="student_id required")
+
+        progress = db.get_student_progress(student_id)
+        return {
+            "success": True,
+            "student_id": student_id,
+            "progress": progress
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/adaptive/recommend-next")
+async def recommend_next(data: dict):
+    """Get adaptive learning recommendations for student"""
+    try:
+        from ml_models import path_recommender
+
+        student_id = data.get("student_id")
+        num_recommendations = data.get("num_recommendations", 3)
+
+        if not student_id:
+            raise HTTPException(status_code=400, detail="student_id required")
+
+        recommendations = path_recommender.get_recommendations(
+            student_id=student_id,
+            num_recommendations=num_recommendations
+        )
+
+        return {
+            "success": True,
+            "student_id": student_id,
+            "recommendations": recommendations
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/adaptive/generate-adaptive-question")
+async def generate_adaptive_question(data: dict):
+    """Generate question at appropriate difficulty level"""
+    try:
+        from ml_models import difficulty_adaptor, irt_model
+
+        student_id = data.get("student_id")
+        topic = data.get("topic")
+        grade_level = data.get("grade_level")
+
+        if not all([student_id, topic, grade_level]):
+            raise HTTPException(status_code=400, detail="student_id, topic, grade_level required")
+
+        # Get student progress to estimate ability
+        progress = db.get_student_progress(student_id)
+        student_ability = irt_model.estimate_ability(
+            sum(obj['correct_answers'] for obj in progress['objectives']),
+            sum(obj['total_attempts'] for obj in progress['objectives'])
+        ) if progress['objectives'] else 0.5
+
+        # Suggest appropriate difficulty
+        suggested_difficulty = difficulty_adaptor.get_next_difficulty(
+            student_ability=student_ability,
+            current_difficulty=0.5,
+            recent_performance=[]
+        )
+
+        # Generate question using existing AI endpoint
+        prompt = f"""Generate a {topic} question for {grade_level} level.
+        Difficulty: {suggested_difficulty} (0=easy, 1=hard)
+        Include 4 multiple choice options and mark the correct answer."""
+
+        # Call OpenAI to generate question
+        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        response = client.chat.completions.create(
+            model="gpt-4",
+            messages=[
+                {"role": "system", "content": "You are an expert educator. Generate a clear, engaging educational question."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.7,
+            max_tokens=300
+        )
+
+        question_text = response.choices[0].message.content
+
+        return {
+            "success": True,
+            "student_id": student_id,
+            "topic": topic,
+            "difficulty": suggested_difficulty,
+            "question": question_text,
+            "student_ability": student_ability
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/adaptive/teacher-insights")
+async def get_teacher_insights(data: dict):
+    """Get analytics and insights for teacher dashboard"""
+    try:
+        class_id = data.get("class_id")
+
+        if not class_id:
+            raise HTTPException(status_code=400, detail="class_id required")
+
+        # Get all students for this class from database
+        import sqlite3
+        from pathlib import Path
+        db_path = Path(__file__).parent / "classroom.db"
+        conn = sqlite3.connect(str(db_path))
+        c = conn.cursor()
+
+        c.execute('''
+            SELECT student_id, name FROM students WHERE teacher_id = ? LIMIT 100
+        ''', (class_id,))
+
+        students = c.fetchall()
+
+        if not students:
+            return {
+                "success": True,
+                "stats": {
+                    "total_students": 0,
+                    "average_mastery": 0.0,
+                    "students_below_threshold": 0,
+                    "students_above_80": 0,
+                    "new_students_today": 0
+                },
+                "students": [],
+                "topics": [],
+                "recommendations": []
+            }
+
+        # Aggregate student progress data
+        student_progresses = []
+        topic_mastery_map = {}
+        total_mastery = 0
+        below_threshold = 0
+        above_80 = 0
+
+        for student_id, name in students:
+            c.execute('''
+                SELECT language, mastery_level, attempts_made, correct_answers FROM learning_objectives
+                WHERE student_id = ?
+            ''', (student_id,))
+
+            objectives = c.fetchall()
+
+            if objectives:
+                student_mastery = sum(obj[1] for obj in objectives) / len(objectives)
+                total_attempts = sum(obj[2] for obj in objectives)
+
+                student_progresses.append({
+                    'name': name,
+                    'student_id': student_id,
+                    'overall_mastery': student_mastery,
+                    'total_attempts': total_attempts
+                })
+
+                total_mastery += student_mastery
+
+                if student_mastery < 0.7:
+                    below_threshold += 1
+                if student_mastery >= 0.8:
+                    above_80 += 1
+
+                # Track topic mastery
+                for lang, mastery, attempts, correct in objectives:
+                    if lang not in topic_mastery_map:
+                        topic_mastery_map[lang] = {'total': 0, 'count': 0}
+                    topic_mastery_map[lang]['total'] += mastery
+                    topic_mastery_map[lang]['count'] += 1
+
+        avg_mastery = total_mastery / len(student_progresses) if student_progresses else 0
+
+        # Convert topic mastery map to list
+        topics = [
+            {
+                'topic': topic,
+                'average_mastery': data['total'] / data['count'] if data['count'] > 0 else 0
+            }
+            for topic, data in sorted(
+                topic_mastery_map.items(),
+                key=lambda x: x[1]['total'] / x[1]['count'] if x[1]['count'] > 0 else 0
+            )
+        ]
+
+        # Get pending recommendations
+        c.execute('''
+            SELECT student_id, recommended_language, reasoning, difficulty_level, priority_score
+            FROM recommendations
+            WHERE student_id IN (SELECT student_id FROM students WHERE teacher_id = ?)
+            AND status = 'pending'
+            ORDER BY priority_score DESC
+            LIMIT 10
+        ''', (class_id,))
+
+        recommendations = []
+        for rec in c.fetchall():
+            student_id, lang, reasoning, difficulty, priority = rec
+            # Find student name
+            student_name = next((s[1] for s in students if s[0] == student_id), f"Student {student_id[:8]}")
+            recommendations.append({
+                'student_id': student_id,
+                'student_name': student_name,
+                'recommended_language': lang,
+                'reasoning': reasoning,
+                'difficulty_level': difficulty,
+                'priority': priority
+            })
+
+        conn.close()
+
+        return {
+            "success": True,
+            "stats": {
+                "total_students": len(students),
+                "average_mastery": avg_mastery,
+                "students_below_threshold": below_threshold,
+                "students_above_80": above_80,
+                "new_students_today": 0
+            },
+            "students": student_progresses[:20],  # Limit to top 20
+            "topics": topics,
+            "recommendations": recommendations
+        }
+    except Exception as e:
+        print(f"[ERROR] Teacher insights error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 if __name__ == "__main__":
     import uvicorn
     import socket

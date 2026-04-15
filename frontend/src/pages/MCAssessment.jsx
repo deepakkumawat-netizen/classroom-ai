@@ -1,13 +1,16 @@
-import React, { useState, useRef } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import OutputBox from '../components/OutputBox'
 import CustomSelect from '../components/CustomSelect'
 import ChatHistory from '../components/ChatHistory'
 import UsageCounter from '../components/UsageCounter'
 import ErrorToast from '../components/ErrorToast'
+import AdaptiveProgressTracker from '../components/AdaptiveProgressTracker'
+import RecommendationPanel from '../components/RecommendationPanel'
 
-const API = 'http://localhost:8001'
+const API = 'http://localhost:5000'
 const STORAGE_KEY = 'classroom-result-assessment'
 const TEACHER_ID = 'teacher-demo-123'
+const STUDENT_ID = 'student-' + (Math.random().toString(36).substring(7))
 
 const grades = ['Kindergarten','Grade 1','Grade 2','Grade 3','Grade 4','Grade 5','Grade 6','Grade 7','Grade 8','Grade 9','Grade 10','Grade 11','Grade 12','College']
 const subjects = ['Mathematics','Science','English Language Arts','Social Studies','History','Geography','Physics','Chemistry','Biology','Computer Science','Art','Music','Physical Education','Foreign Language','Other']
@@ -425,11 +428,17 @@ export default function MCAssessment() {
       </div>
 
       {/* ── RIGHT PANEL ── */}
-      <div style={{ height: PAGE_H, display: 'flex', flexDirection: 'column', gap: 16 }} className="fade-up-1">
+      <div style={{ height: PAGE_H, display: 'flex', flexDirection: 'column', overflow: 'auto' }} className="fade-up-1">
+        {/* Adaptive Learning Components */}
+        <div style={{ padding: '0 0 16px 0' }}>
+          <AdaptiveProgressTracker studentId={STUDENT_ID} teacherId={TEACHER_ID} />
+          <RecommendationPanel studentId={STUDENT_ID} teacherId={TEACHER_ID} />
+        </div>
+
+        {/* Output Box */}
         <OutputBox result={result} loading={loading} toolName="assessment" onClear={clearResult}
           icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>}
         />
-        <UsageCounter teacherId={TEACHER_ID} toolName="assessment" onLimitExceeded={setLimitError} />
       </div>
     </div>
 

@@ -7,6 +7,7 @@ import WorksheetGenerator from './pages/WorksheetGenerator'
 import LessonPlanGenerator from './pages/LessonPlanGenerator'
 import MCAssessment from './pages/MCAssessment'
 import AutoGenerator from './pages/AutoGenerator'
+import TeacherInsights from './pages/TeacherInsights'
 
 export default function App() {
   return (
@@ -22,6 +23,7 @@ export default function App() {
               <Route path="/worksheet" element={<WorksheetGenerator />} />
               <Route path="/lesson-plan" element={<LessonPlanGenerator />} />
               <Route path="/mc-assessment" element={<MCAssessment />} />
+              <Route path="/teacher-insights" element={<TeacherInsights />} />
               <Route path="*" element={<Navigate to="/" />} />
             </Routes>
           </div>
