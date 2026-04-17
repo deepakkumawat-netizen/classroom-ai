@@ -20,7 +20,7 @@ export function TeacherDashboard({ classId }) {
       setError(null)
 
       // Fetch class-wide statistics
-      const statsRes = await fetch('http://localhost:5000/api/adaptive/teacher-insights', {
+      const statsRes = await fetch('http://localhost:8001/api/adaptive/teacher-insights', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ class_id: classId })

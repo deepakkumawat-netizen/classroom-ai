@@ -12,7 +12,7 @@ export default function RecommendationPanel({ studentId, teacherId }) {
 
   const fetchRecommendations = async () => {
     try {
-      const response = await fetch('http://localhost:5000/api/adaptive/recommend-next', {
+      const response = await fetch('http://localhost:8001/api/adaptive/recommend-next', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

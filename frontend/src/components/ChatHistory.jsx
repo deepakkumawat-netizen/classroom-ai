@@ -8,7 +8,7 @@ const ChatHistory = ({ teacherId, isOpen, onClose, onSelectChat }) => {
   const fetchChatHistory = async () => {
     try {
       setLoading(true);
-      const response = await fetch('http://localhost:5000/api/chat-history', {
+      const response = await fetch('http://localhost:8001/api/chat-history', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ teacher_id: teacherId })

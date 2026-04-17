@@ -7,7 +7,7 @@ import ErrorToast from '../components/ErrorToast'
 import AdaptiveProgressTracker from '../components/AdaptiveProgressTracker'
 import RecommendationPanel from '../components/RecommendationPanel'
 
-const API = 'http://localhost:5000'
+const API = 'http://localhost:8001'
 const STORAGE_KEY = 'classroom-result-assessment'
 const TEACHER_ID = 'teacher-demo-123'
 const STUDENT_ID = 'student-' + (Math.random().toString(36).substring(7))

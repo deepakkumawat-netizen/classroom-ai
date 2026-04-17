@@ -14,7 +14,7 @@ export default function AdaptiveProgressTracker({ studentId, teacherId }) {
 
   const fetchStudentProgress = async () => {
     try {
-      const response = await fetch('http://localhost:5000/api/adaptive/student-progress', {
+      const response = await fetch('http://localhost:8001/api/adaptive/student-progress', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ student_id: studentId })
