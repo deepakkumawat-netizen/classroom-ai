@@ -193,11 +193,6 @@ def call_openai(system_prompt: str, user_prompt: str, max_tokens: int = 3500) ->
 
 # ─── ROUTES ───────────────────────────────────────────
 
-@app.get("/")
-def root():
-    return {"message": "ClassroomAI API is running!"}
-
-
 @app.post("/api/worksheet")
 def generate_worksheet(req: WorksheetRequest):
     if not req.topic.strip():
