@@ -61,10 +61,11 @@ export default function Sidebar() {
     <aside style={{
       position: 'fixed', top: 0, left: 0,
       width: 'var(--sidebar-w)', height: '100vh',
-      background: 'var(--white)',
+      background: 'var(--surface)',
       borderRight: '1.5px solid var(--border)',
       display: 'flex', flexDirection: 'column',
       zIndex: 100, overflowY: 'auto',
+      transition: 'background 0.3s ease, border-color 0.3s ease',
     }}>
       {/* Logo */}
       <div style={{
@@ -74,10 +75,10 @@ export default function Sidebar() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <div style={{
             width: 38, height: 38,
-            background: 'linear-gradient(135deg, #399aff, #1a7de0)',
+            background: 'linear-gradient(135deg, var(--accent), var(--accent-dark))',
             borderRadius: 12,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 4px 14px rgba(57,154,255,0.35)',
+            boxShadow: 'var(--shadow)',
             flexShrink: 0,
           }}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
@@ -93,7 +94,7 @@ export default function Sidebar() {
 
       {/* Nav */}
       <nav style={{ padding: '12px 12px', flex: 1 }}>
-        <div style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.8px', padding: '4px 10px 10px' }}>
+        <div style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-2)', textTransform: 'uppercase', letterSpacing: '0.8px', padding: '4px 10px 10px', transition: 'color 0.3s ease' }}>
           Tools
         </div>
         {nav.map((item) => (
@@ -112,24 +113,24 @@ export default function Sidebar() {
               fontSize: '0.875rem',
               fontWeight: 600,
               color: isActive
-                ? (item.highlight ? '#d97706' : 'var(--accent)')
-                : item.highlight ? '#b45309' : 'var(--text-2)',
+                ? 'var(--accent)'
+                : 'var(--text-1)',
               background: isActive
-                ? (item.highlight ? '#fffbeb' : 'var(--accent-soft)')
-                : item.highlight ? '#fefce8' : 'transparent',
-              border: item.highlight ? '1.5px solid #fde68a' : '1.5px solid transparent',
+                ? 'var(--accent-soft)'
+                : 'transparent',
+              border: isActive ? '1.5px solid var(--accent)' : '1.5px solid transparent',
               transition: 'var(--transition)',
             })}
             onMouseEnter={e => {
-              if (!e.currentTarget.style.background.includes('eef6ff')) {
+              const isActive = e.currentTarget.classList.contains('active')
+              if (!isActive) {
                 e.currentTarget.style.background = 'var(--bg)'
-                e.currentTarget.style.color = 'var(--text-1)'
               }
             }}
             onMouseLeave={e => {
-              if (!e.currentTarget.classList.contains('active')) {
-                e.currentTarget.style.background = ''
-                e.currentTarget.style.color = ''
+              const isActive = e.currentTarget.classList.contains('active')
+              if (!isActive) {
+                e.currentTarget.style.background = 'transparent'
               }
             }}
           >

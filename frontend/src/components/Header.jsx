@@ -1,5 +1,6 @@
 import React from 'react'
 import { useLocation } from 'react-router-dom'
+import ThemeToggle from './ThemeToggle'
 
 const titles = {
   '/':             { label: 'Dashboard',              sub: 'Welcome back! Choose a tool to get started.' },
@@ -15,7 +16,7 @@ export default function Header() {
   return (
     <header style={{
       height: 'var(--header-h)',
-      background: 'var(--white)',
+      background: 'var(--surface)',
       borderBottom: '1.5px solid var(--border)',
       display: 'flex',
       alignItems: 'center',
@@ -24,6 +25,7 @@ export default function Header() {
       position: 'sticky',
       top: 0,
       zIndex: 50,
+      transition: 'background 0.3s ease, border-color 0.3s ease',
     }}>
       <div>
         <div style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-1)', letterSpacing: '-0.3px' }}>
@@ -33,7 +35,8 @@ export default function Header() {
           {info.sub}
         </div>
       </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+        <ThemeToggle />
         <span className="badge badge-blue">✦ AI Powered</span>
         <div style={{
           width: 36, height: 36,

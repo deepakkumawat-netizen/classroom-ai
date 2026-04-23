@@ -24,6 +24,23 @@
   --shadow-lg:   0 12px 40px rgba(57,154,255,0.16);
 }
 
+/* ── DARK MODE ─────────────────────────────────── */
+:root.dark-mode {
+  --accent:      #06b6d4;
+  --accent-dark: #0891b2;
+  --accent-soft: #082f3f;
+  --accent-mid:  #164e63;
+  --white:       #ffffff;
+  --bg:          #0f172a;
+  --surface:     #1a2332;
+  --border:      #334155;
+  --text-1:      #e2e8f0;
+  --text-2:      #cbd5e1;
+  --text-3:      #94a3b8;
+  --success:     #22c55e;
+  --warning:     #f59e0b;
+}
+
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 html { scroll-behavior: smooth; }
@@ -34,6 +51,7 @@ body {
   color: var(--text-1);
   -webkit-font-smoothing: antialiased;
   min-height: 100vh;
+  transition: background 0.3s ease, color 0.3s ease;
 }
 
 /* ── SMOOTH SCROLLBARS ───────────────────────── */
@@ -149,7 +167,7 @@ body {
   font-family: var(--font);
   font-size: 0.9rem;
   color: var(--text-1);
-  background: var(--white);
+  background: var(--surface);
   transition: var(--transition);
   outline: none;
 }
@@ -175,7 +193,7 @@ body {
 
 /* ── CARDS ───────────────────────────────────── */
 .card {
-  background: var(--white);
+  background: var(--surface);
   border: 1.5px solid var(--border);
   border-radius: var(--radius-lg);
   padding: 24px;
@@ -184,7 +202,7 @@ body {
 
 /* ── OUTPUT BOX ──────────────────────────────── */
 .output-box {
-  background: var(--white);
+  background: var(--surface);
   border: 1.5px solid var(--border);
   border-radius: var(--radius-lg);
   overflow: hidden;

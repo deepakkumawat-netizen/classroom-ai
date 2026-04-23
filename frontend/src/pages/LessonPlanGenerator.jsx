@@ -7,7 +7,7 @@ import ErrorToast from '../components/ErrorToast'
 import AdaptiveProgressTracker from '../components/AdaptiveProgressTracker'
 import RecommendationPanel from '../components/RecommendationPanel'
 
-const API = 'http://localhost:8001'
+const API = window.location.hostname === 'localhost' ? 'http://localhost:8001' : window.location.origin
 const STORAGE_KEY = 'classroom-result-lesson'
 const TEACHER_ID = 'teacher-demo-123'
 const STUDENT_ID = 'student-' + (Math.random().toString(36).substring(7))
@@ -405,9 +405,9 @@ export default function LessonPlanGenerator() {
             <label className="form-label">Output</label>
             <button type="button" onClick={() => set('include_topic_overview', !form.include_topic_overview)} style={{
               width: '100%', padding: '9px 14px', borderRadius: 10, fontFamily: 'var(--font)',
-              border: form.include_topic_overview ? '2px solid #399aff' : '1.5px solid var(--border)',
-              background: form.include_topic_overview ? '#eff6ff' : 'var(--white)',
-              color: form.include_topic_overview ? '#399aff' : 'var(--text-2)',
+              border: form.include_topic_overview ? '2px solid var(--accent)' : '1.5px solid var(--border)',
+              background: form.include_topic_overview ? 'var(--accent-soft)' : 'var(--surface)',
+              color: form.include_topic_overview ? 'var(--accent)' : 'var(--text-2)',
               fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer',
               transition: 'all 0.18s', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 8,
             }}>

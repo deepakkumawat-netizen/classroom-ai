@@ -7,7 +7,8 @@ const UsageCounter = forwardRef(({ teacherId, toolName, onLimitExceeded }, ref) 
   const checkUsage = async () => {
     console.log(`[UsageCounter] Checking usage for ${teacherId}/${toolName}`);
     try {
-      const response = await fetch('http://localhost:8001/api/check-usage', {
+      const apiBase = window.location.hostname === 'localhost' ? 'http://localhost:8001' : window.location.origin
+      const response = await fetch(`${apiBase}/api/check-usage`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ teacher_id: teacherId, tool_name: toolName })

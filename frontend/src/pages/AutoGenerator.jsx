@@ -27,7 +27,7 @@ function DownDropdown({ value, onChange, options, placeholder, active }) {
         style={{
           width: '100%', padding: '8px 36px 8px 12px', borderRadius: 8, textAlign: 'left',
           border: active ? '1.5px solid var(--accent)' : '1.5px solid var(--border)',
-          background: '#fff', color: selected ? 'var(--text-1)' : 'var(--text-3)',
+          background: 'var(--surface)', color: selected ? 'var(--text-1)' : 'var(--text-3)',
           fontSize: '0.875rem', fontFamily: 'var(--font)', cursor: 'pointer',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           boxSizing: 'border-box',
@@ -45,7 +45,7 @@ function DownDropdown({ value, onChange, options, placeholder, active }) {
       {open && (
         <ul style={{
           position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0,
-          zIndex: 9999, background: '#fff', border: '1.5px solid var(--border)',
+          zIndex: 9999, background: 'var(--surface)', border: '1.5px solid var(--border)',
           borderRadius: 8, boxShadow: '0 8px 24px rgba(0,0,0,0.13)',
           maxHeight: 240, overflowY: 'auto', padding: '4px 0', margin: 0,
           listStyle: 'none',
@@ -60,7 +60,7 @@ function DownDropdown({ value, onChange, options, placeholder, active }) {
                 background: opt === value ? 'var(--accent-soft)' : 'transparent',
                 fontWeight: opt === value ? 600 : 400,
               }}
-              onMouseEnter={e => { if (opt !== value) e.currentTarget.style.background = '#f5f5f5' }}
+              onMouseEnter={e => { if (opt !== value) e.currentTarget.style.background = 'var(--bg)' }}
               onMouseLeave={e => { e.currentTarget.style.background = opt === value ? 'var(--accent-soft)' : 'transparent' }}
             >
               {opt}
@@ -72,7 +72,7 @@ function DownDropdown({ value, onChange, options, placeholder, active }) {
   )
 }
 
-const API = 'http://localhost:8001'
+const API = window.location.hostname === 'localhost' ? 'http://localhost:8001' : window.location.origin
 const TEACHER_ID = 'teacher-demo-123'
 const STUDENT_ID = 'student-' + (Math.random().toString(36).substring(7))
 

@@ -7,7 +7,7 @@ import ErrorToast from '../components/ErrorToast'
 import AdaptiveProgressTracker from '../components/AdaptiveProgressTracker'
 import RecommendationPanel from '../components/RecommendationPanel'
 
-const API = 'http://localhost:8001'
+const API = window.location.hostname === 'localhost' ? 'http://localhost:8001' : window.location.origin
 const STORAGE_KEY = 'classroom-result-worksheet'
 const TEACHER_ID = 'teacher-demo-123'
 const STUDENT_ID = 'student-' + (Math.random().toString(36).substring(7))
@@ -430,7 +430,7 @@ export default function WorksheetGenerator() {
                 <button key={t.value} type="button" onClick={() => set('worksheet_type', t.value)} style={{
                   padding: '9px 8px', borderRadius: 10, fontFamily: 'var(--font)',
                   border: form.worksheet_type === t.value ? '2px solid var(--accent)' : '1.5px solid var(--border)',
-                  background: form.worksheet_type === t.value ? 'var(--accent-soft)' : 'var(--white)',
+                  background: form.worksheet_type === t.value ? 'var(--accent-soft)' : 'var(--surface)',
                   color: form.worksheet_type === t.value ? 'var(--accent)' : 'var(--text-2)',
                   fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer',
                   transition: 'all 0.18s', textAlign: 'center', lineHeight: 1.3,

@@ -8,12 +8,15 @@ if sys.platform == 'win32':
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from openai import OpenAI
 from dotenv import load_dotenv
 import os
 import json
 from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 from database import db
 from mcp_tools import get_chat_history, check_usage_limit, increment_usage
 
@@ -1032,6 +1035,32 @@ async def get_teacher_insights(data: dict):
     except Exception as e:
         print(f"[ERROR] Teacher insights error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+# ─── SERVE FRONTEND ────────────────────────────────────
+
+FRONTEND_DIST = Path(__file__).parent.parent / "frontend" / "dist"
+
+if FRONTEND_DIST.exists():
+    app.mount("/assets", StaticFiles(directory=FRONTEND_DIST / "assets"), name="assets")
+
+@app.get("/")
+def serve_index():
+    index_file = FRONTEND_DIST / "index.html"
+    if index_file.exists():
+        return FileResponse(index_file)
+    return {"message": "Frontend not built"}
+
+@app.get("/{full_path:path}", include_in_schema=False)
+def serve_frontend(full_path: str):
+    if full_path.startswith("api/"):
+        return {"error": "Not found"}
+    file_path = FRONTEND_DIST / full_path
+    if file_path.exists():
+        return FileResponse(file_path)
+    index_file = FRONTEND_DIST / "index.html"
+    if index_file.exists():
+        return FileResponse(index_file)
+    return {"error": "Not found"}
 
 if __name__ == "__main__":
     import uvicorn

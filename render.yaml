@@ -1,25 +1,18 @@
 services:
-  # Backend API Service
   - type: web
-    name: classroom-ai-backend
-    runtime: python
-    rootDir: backend
-    buildCommand: pip install -r requirements.txt
-    startCommand: python main.py
+    name: classroom-ai
+    env: python
+    region: oregon
+    plan: free
+
+    buildCommand: |
+      pip install -r backend/requirements.txt && cd frontend && npm install && npm run build
+
+    startCommand: |
+      cd backend && uvicorn main:app --host 0.0.0.0 --port $PORT
+
     envVars:
       - key: OPENAI_API_KEY
-        scope: build,runtime
         sync: false
-    autoDeploy: true
-
-  # Frontend Service
-  - type: web
-    name: classroom-ai-frontend
-    runtime: node
-    rootDir: frontend
-    buildCommand: npm install && npm run build
-    startCommand: npm run preview
-    envVars:
-      - key: VITE_API_URL
-        value: https://classroom-ai-backend.onrender.com
-    autoDeploy: true
+      - key: PYTHON_VERSION
+        value: "3.11.0"

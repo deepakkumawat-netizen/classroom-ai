@@ -60,7 +60,7 @@ function RecentGenerations() {
           const tab = activeTab[item.id] || 'lesson_plan'
           return (
             <div key={item.id} style={{
-              background: 'var(--white)', border: '1.5px solid var(--border)',
+              background: 'var(--surface)', border: '1.5px solid var(--border)',
               borderRadius: 14, overflow: 'hidden', boxShadow: 'var(--shadow)',
             }}>
               {/* Header row */}
@@ -69,7 +69,7 @@ function RecentGenerations() {
                 style={{
                   display: 'flex', alignItems: 'center', gap: 14,
                   padding: '14px 20px', cursor: 'pointer',
-                  background: isOpen ? 'var(--accent-soft)' : 'var(--white)',
+                  background: isOpen ? 'var(--accent-soft)' : 'var(--surface)',
                   borderBottom: isOpen ? '1.5px solid var(--border)' : 'none',
                   transition: 'background 0.15s',
                 }}
@@ -98,7 +98,7 @@ function RecentGenerations() {
                       }}
                       style={{
                         fontSize: 11, fontWeight: 600, padding: '4px 10px', borderRadius: 6,
-                        border: '1.5px solid var(--border)', background: 'var(--white)',
+                        border: '1.5px solid var(--border)', background: 'var(--surface)',
                         cursor: 'pointer', color: 'var(--text-2)',
                         display: 'flex', alignItems: 'center', gap: 4,
                       }}
@@ -248,7 +248,7 @@ export default function Dashboard() {
         <p style={{ fontSize: '1rem', opacity: 0.88, maxWidth: 500, lineHeight: 1.6, marginBottom: 20 }}>
           Your all-in-one AI toolkit for teachers. Generate worksheets, lesson plans, and quizzes in seconds — not hours.
         </p>
-        <button className="btn" onClick={() => navigate('/worksheet')} style={{ background: '#fff', color: 'var(--accent)', fontWeight: 700, padding: '10px 22px' }}>
+        <button className="btn" onClick={() => navigate('/worksheet')} style={{ background: 'var(--white)', color: 'var(--accent)', fontWeight: 700, padding: '10px 22px' }}>
           Start Creating →
         </button>
       </div>
@@ -257,7 +257,7 @@ export default function Dashboard() {
       <div className="grid-3 fade-up-1" style={{ gridTemplateColumns: 'repeat(4,1fr)', marginBottom: 28 }}>
         {stats.map((s, i) => (
           <div key={i} style={{
-            background: 'var(--white)', border: '1.5px solid var(--border)',
+            background: 'var(--surface)', border: '1.5px solid var(--border)',
             borderRadius: 14, padding: '16px 20px',
             display: 'flex', alignItems: 'center', gap: 12,
             boxShadow: 'var(--shadow)',
@@ -315,7 +315,7 @@ export default function Dashboard() {
               key={i}
               onClick={() => navigate(tool.to)}
               style={{
-                background: 'var(--white)',
+                background: 'var(--surface)',
                 border: `1.5px solid var(--border)`,
                 borderRadius: 18,
                 padding: '24px',

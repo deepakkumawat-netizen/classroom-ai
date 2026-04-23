@@ -41,7 +41,7 @@ export default function CustomSelect({ value, onChange, disabled, style, childre
     padding: '8px 32px 8px 12px',
     borderRadius: 8,
     border: style?.borderColor ? `1.5px solid ${style.borderColor}` : '1.5px solid var(--border)',
-    background: disabled ? '#f9f9f9' : '#fff',
+    background: disabled ? 'var(--bg)' : 'var(--surface)',
     color: selected ? 'var(--text-1)' : 'var(--text-3)',
     fontSize: '0.875rem',
     fontFamily: 'var(--font)',
@@ -64,7 +64,7 @@ export default function CustomSelect({ value, onChange, disabled, style, childre
     left: 0,
     right: 0,
     zIndex: 9999,
-    background: '#fff',
+    background: 'var(--surface)',
     border: '1.5px solid var(--border)',
     borderRadius: 8,
     boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
@@ -111,7 +111,7 @@ export default function CustomSelect({ value, onChange, disabled, style, childre
                 listStyle: 'none',
                 transition: 'background 0.1s',
               }}
-              onMouseEnter={e => { if (String(opt.value) !== String(value)) e.currentTarget.style.background = '#f5f5f5' }}
+              onMouseEnter={e => { if (String(opt.value) !== String(value)) e.currentTarget.style.background = 'var(--bg)' }}
               onMouseLeave={e => { e.currentTarget.style.background = String(opt.value) === String(value) ? 'var(--accent-soft)' : 'transparent' }}
             >
               {opt.label}
