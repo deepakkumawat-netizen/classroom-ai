@@ -1,3 +1,8 @@
+.no-transitions *, .no-transitions *::before, .no-transitions *::after {
+  transition: none !important;
+  animation: none !important;
+}
+
 /* ── GLOBAL RESET & VARIABLES ─────────────────── */
 :root {
   --accent:      #399aff;

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useLayoutEffect, useState } from 'react';
 
 const ThemeContext = createContext();
 
@@ -9,7 +9,7 @@ export function ThemeProvider({ children }) {
     return window.matchMedia('(prefers-color-scheme: dark)').matches;
   });
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const root = document.documentElement;
     if (isDark) {
       root.classList.add('dark-mode');
@@ -20,7 +20,11 @@ export function ThemeProvider({ children }) {
     }
   }, [isDark]);
 
-  const toggleTheme = () => setIsDark(!isDark);
+  const toggleTheme = () => {
+    document.documentElement.classList.add('no-transitions');
+    requestAnimationFrame(() => document.documentElement.classList.remove('no-transitions'));
+    setIsDark(prev => !prev);
+  };
 
   return (
     <ThemeContext.Provider value={{ isDark, toggleTheme }}>
