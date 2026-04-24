@@ -278,6 +278,23 @@ export default function AutoGenerator() {
   const [listening, setListening] = useState(false)
   const recognitionRef = useRef(null)
   const usageCounterRef = useRef(null)
+  const [sourceMaterial, setSourceMaterial] = useState('')
+  const [materialName, setMaterialName]     = useState('')
+  const [materialUploading, setMaterialUploading] = useState(false)
+  const materialFileRef = useRef(null)
+
+  const handleMaterialUpload = async (e) => {
+    const file = e.target.files[0]; if (!file) return
+    setMaterialUploading(true)
+    try {
+      const fd = new FormData(); fd.append('file', file)
+      const res = await fetch(`${API}/api/upload-material`, { method: 'POST', body: fd })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.detail || 'Upload failed')
+      setSourceMaterial(data.text); setMaterialName(file.name)
+    } catch (e) { alert('Could not read file: ' + e.message) }
+    finally { setMaterialUploading(false); e.target.value = '' }
+  }
 
   const startVoice = () => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
@@ -361,7 +378,7 @@ export default function AutoGenerator() {
       const res = await fetch(`${API}/api/auto-generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...form, topic: activeTopic }),
+        body: JSON.stringify({ ...form, topic: activeTopic, source_material: sourceMaterial }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.detail || 'Generation failed')
@@ -684,6 +701,24 @@ export default function AutoGenerator() {
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--text-3)' }}>
             <span>3</span><span>25</span>
           </div>
+        </div>
+
+        {/* Upload Teaching Material */}
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 }}>Upload Your Material (optional)</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <button type="button" disabled={materialUploading} onClick={() => materialFileRef.current?.click()}
+              style={{ display:'flex',alignItems:'center',gap:6,padding:'7px 14px',borderRadius:8,
+                border:'1.5px solid var(--accent-mid)',background:'var(--accent-soft)',
+                color:'var(--accent)',fontSize:'0.82rem',fontWeight:600,cursor:'pointer' }}>
+              {materialUploading ? '⏳ Reading…' : '📄 Upload PDF / DOCX / TXT'}
+            </button>
+            {sourceMaterial && <span style={{ fontSize:'0.78rem',color:'#10b981',fontWeight:600 }}>✓ {materialName}</span>}
+            {sourceMaterial && <button type="button" onClick={() => { setSourceMaterial(''); setMaterialName('') }}
+              style={{ fontSize:'0.75rem',color:'#ef4444',background:'none',border:'none',cursor:'pointer',fontWeight:600 }}>✕ Remove</button>}
+          </div>
+          <input ref={materialFileRef} type="file" accept=".pdf,.docx,.txt,.md" style={{ display:'none' }} onChange={handleMaterialUpload} />
+          {sourceMaterial && <div style={{ fontSize:'0.72rem',color:'var(--text-3)',marginTop:4 }}>All 3 tools will be based on your uploaded material</div>}
         </div>
 
         {errors.general && (

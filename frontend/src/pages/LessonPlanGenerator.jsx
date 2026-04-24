@@ -195,6 +195,23 @@ export default function LessonPlanGenerator() {
   const [showHistory, setShowHistory] = useState(false)
   const [limitError, setLimitError] = useState('')
   const usageCounterRef = useRef(null)
+  const [sourceMaterial, setSourceMaterial] = useState('')
+  const [materialName, setMaterialName]     = useState('')
+  const [materialUploading, setMaterialUploading] = useState(false)
+  const materialFileRef = useRef(null)
+
+  const handleMaterialUpload = async (e) => {
+    const file = e.target.files[0]; if (!file) return
+    setMaterialUploading(true)
+    try {
+      const fd = new FormData(); fd.append('file', file)
+      const res = await fetch(`${API}/api/upload-material`, { method: 'POST', body: fd })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.detail || 'Upload failed')
+      setSourceMaterial(data.text); setMaterialName(file.name)
+    } catch (e) { alert('Could not read file: ' + e.message) }
+    finally { setMaterialUploading(false); e.target.value = '' }
+  }
 
   const set = (k, v) => { setForm(f => ({ ...f, [k]: v })); setErrors(e => ({ ...e, [k]: '' })) }
 
@@ -236,7 +253,7 @@ export default function LessonPlanGenerator() {
     try {
       const res  = await fetch(`${API}/api/lesson-plan`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
+        body: JSON.stringify({ ...form, source_material: sourceMaterial }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.detail || 'Error')
@@ -428,6 +445,24 @@ export default function LessonPlanGenerator() {
               placeholder="e.g. Students have prior knowledge of cell biology…"
               value={form.additional_notes} onChange={e => set('additional_notes', e.target.value)}
               style={{ minHeight: 55, maxHeight: 90, borderColor: '#bfdbfe' }}/>
+          </div>
+
+          {/* Upload Teaching Material */}
+          <div className="form-group">
+            <label className="form-label">Upload Your Material (optional)</label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <button type="button" disabled={materialUploading} onClick={() => materialFileRef.current?.click()}
+                style={{ display:'flex',alignItems:'center',gap:6,padding:'7px 14px',borderRadius:8,
+                  border:'1.5px solid var(--accent-mid)',background:'var(--accent-soft)',
+                  color:'var(--accent)',fontSize:'0.82rem',fontWeight:600,cursor:'pointer' }}>
+                {materialUploading ? '⏳ Reading…' : '📄 Upload PDF / DOCX / TXT'}
+              </button>
+              {sourceMaterial && <span style={{ fontSize:'0.78rem',color:'#10b981',fontWeight:600 }}>✓ {materialName}</span>}
+              {sourceMaterial && <button type="button" onClick={() => { setSourceMaterial(''); setMaterialName('') }}
+                style={{ fontSize:'0.75rem',color:'#ef4444',background:'none',border:'none',cursor:'pointer',fontWeight:600 }}>✕ Remove</button>}
+            </div>
+            <input ref={materialFileRef} type="file" accept=".pdf,.docx,.txt,.md" style={{ display:'none' }} onChange={handleMaterialUpload} />
+            {sourceMaterial && <div style={{ fontSize:'0.72rem',color:'var(--text-3)',marginTop:4 }}>AI will align the lesson to your uploaded material</div>}
           </div>
 
           {errors.general && (

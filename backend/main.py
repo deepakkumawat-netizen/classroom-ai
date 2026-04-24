@@ -6,7 +6,8 @@ import sys
 if sys.platform == 'win32':
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File
+import io
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -52,10 +53,11 @@ class WorksheetRequest(BaseModel):
     subject: str = ""
     worksheet_type: str = "mixed"
     num_questions: int = 10
-    differentiation_level: str = "grade-level"   # grade-level | beginner | advanced | mixed
-    blooms_level: str = "mixed"                   # remember | understand | apply | analyze | evaluate | create | mixed
+    differentiation_level: str = "grade-level"
+    blooms_level: str = "mixed"
     include_word_bank: bool = False
     additional_instructions: str = ""
+    source_material: str = ""
 
 class LessonPlanRequest(BaseModel):
     topic: str
@@ -64,12 +66,13 @@ class LessonPlanRequest(BaseModel):
     duration: str = "45 minutes"
     objectives: str = ""
     standards: str = ""
-    class_type: str = "in-person"      # in-person | remote | hybrid
-    learning_style: str = "mixed"      # mixed | visual | auditory | kinesthetic
-    student_needs: str = "general"     # general | ell | special_needs | gifted
-    tech_integration: str = "low"      # low | digital | interactive
+    class_type: str = "in-person"
+    learning_style: str = "mixed"
+    student_needs: str = "general"
+    tech_integration: str = "low"
     include_topic_overview: bool = True
     additional_notes: str = ""
+    source_material: str = ""
 
 class MCAssessmentRequest(BaseModel):
     topic: str
@@ -77,11 +80,12 @@ class MCAssessmentRequest(BaseModel):
     subject: str = ""
     num_questions: int = 10
     difficulty: str = "medium"
-    blooms_level: str = "mixed"           # remember | understand | apply | analyze | evaluate | create | mixed
-    question_format: str = "pure_mc"      # pure_mc | mc_truefalse | mc_short
+    blooms_level: str = "mixed"
+    question_format: str = "pure_mc"
     include_explanations: bool = True
     standards: str = ""
     additional_instructions: str = ""
+    source_material: str = ""
 
 class AutoGenerateRequest(BaseModel):
     topic: str
@@ -90,6 +94,7 @@ class AutoGenerateRequest(BaseModel):
     worksheet_type: str = "mixed"
     mc_format: str = "pure_mc"
     num_questions: int = 10
+    source_material: str = ""
 
 # ─── RAG ENDPOINT MODELS ──────────────────────────────
 
@@ -234,11 +239,19 @@ def generate_worksheet(req: WorksheetRequest):
             "students must use, arranged in a bordered box with words separated by commas."
         )
 
+    material_note = ""
+    if req.source_material.strip():
+        material_note = (
+            f"\n\nTEACHER-UPLOADED SOURCE MATERIAL (base your questions primarily on this content):\n"
+            f"---\n{req.source_material[:5000]}\n---\n"
+        )
+
     system_prompt = (
         "You are an expert classroom teacher and curriculum specialist with 20+ years of experience. "
         "Create professional, print-ready worksheets that are engaging, pedagogically sound, and appropriately rigorous. "
         "Ensure questions are clear, unambiguous, and aligned to the specified grade level and Bloom's level. "
-        "Write in plain text ONLY — absolutely no markdown, no asterisks, no hashtags, no bold symbols. "
+        + ("When source material is provided, derive ALL questions directly from that content. " if req.source_material.strip() else "")
+        + "Write in plain text ONLY — absolutely no markdown, no asterisks, no hashtags, no bold symbols. "
         "Use CAPITAL LETTERS for section headers and dashes for separators."
     )
 
@@ -251,7 +264,8 @@ def generate_worksheet(req: WorksheetRequest):
         f"DIFFERENTIATION LEVEL: {diff}\n"
         f"BLOOM'S TAXONOMY FOCUS: {blooms}\n"
         f"{word_bank_note}\n"
-        f"{'ADDITIONAL INSTRUCTIONS: ' + req.additional_instructions if req.additional_instructions else ''}\n\n"
+        f"{'ADDITIONAL INSTRUCTIONS: ' + req.additional_instructions if req.additional_instructions else ''}\n"
+        f"{material_note}\n"
         "FORMAT REQUIREMENTS (plain text only, no markdown):\n"
         "- Worksheet title in ALL CAPS\n"
         "- Name / Date / Class lines\n"
@@ -266,6 +280,38 @@ def generate_worksheet(req: WorksheetRequest):
 
     result = call_openai(system_prompt, user_prompt)
     return {"result": result, "tool": "worksheet"}
+
+
+@app.post("/api/upload-material")
+async def upload_material(file: UploadFile = File(...)):
+    """Extract text from teacher-uploaded material (PDF, DOCX, TXT, MD)"""
+    content = await file.read()
+    filename = (file.filename or "").lower()
+    try:
+        if filename.endswith(".pdf"):
+            try:
+                import pypdf
+                reader = pypdf.PdfReader(io.BytesIO(content))
+                text = "\n".join(p.extract_text() or "" for p in reader.pages)
+            except ImportError:
+                raise HTTPException(status_code=400, detail="PDF support not installed. Upload a .txt file instead.")
+        elif filename.endswith(".docx"):
+            try:
+                import docx
+                doc = docx.Document(io.BytesIO(content))
+                text = "\n".join(p.text for p in doc.paragraphs if p.text.strip())
+            except ImportError:
+                raise HTTPException(status_code=400, detail="DOCX support not installed. Upload a .txt file instead.")
+        else:
+            text = content.decode("utf-8", errors="ignore")
+        text = text.strip()[:8000]
+        if not text:
+            raise HTTPException(status_code=400, detail="Could not extract text from file.")
+        return {"text": text, "chars": len(text), "filename": file.filename}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Could not process file: {str(e)}")
 
 
 @app.post("/api/lesson-plan")
@@ -329,12 +375,20 @@ def generate_lesson_plan(req: LessonPlanRequest):
         topic_overview = call_openai(topic_system, topic_prompt, max_tokens=2500)
         topic_overview = "=== PAGE 1: TOPIC OVERVIEW ===\n\n" + topic_overview + "\n\n" + "="*50 + "\n\n=== PAGE 2: LESSON PLAN ===\n\n"
 
+    lesson_material_note = ""
+    if req.source_material.strip():
+        lesson_material_note = (
+            f"\n\nTEACHER-UPLOADED SOURCE MATERIAL (align the lesson to this content):\n"
+            f"---\n{req.source_material[:5000]}\n---\n"
+        )
+
     system_prompt = (
         "You are a master curriculum designer and instructional coach expert in UbD (Understanding by Design), "
         "differentiated instruction, and modern pedagogical best practices. "
         "Create detailed, actionable, classroom-ready lesson plans any teacher can pick up and use immediately. "
         "Include specific timing estimates, concrete student activities, and teacher facilitation notes. "
-        "Write in plain text ONLY — no markdown, no asterisks, no hashtags. "
+        + ("When source material is provided, align ALL activities and content directly to it. " if req.source_material.strip() else "")
+        + "Write in plain text ONLY — no markdown, no asterisks, no hashtags. "
         "Use numbered sections with UPPERCASE HEADERS."
     )
 
@@ -390,6 +444,7 @@ def generate_lesson_plan(req: LessonPlanRequest):
         "    - What to look for during the lesson\n"
         "    - Ideas for the follow-up lesson\n\n"
         "Write everything in plain text. No **, ##, or markdown formatting of any kind."
+        f"{lesson_material_note}"
     )
 
     lesson_result = call_openai(system_prompt, user_prompt, max_tokens=4000)
@@ -435,13 +490,21 @@ def generate_mc_assessment(req: MCAssessmentRequest):
         "In the ANSWER KEY, list only the question number and correct answer letter."
     )
 
+    mc_material_note = ""
+    if req.source_material.strip():
+        mc_material_note = (
+            f"\n\nTEACHER-UPLOADED SOURCE MATERIAL (base ALL questions on this content):\n"
+            f"---\n{req.source_material[:5000]}\n---\n"
+        )
+
     system_prompt = (
         "You are an expert assessment designer with deep knowledge of curriculum standards, "
         "Bloom's Taxonomy, and best practices in test construction. "
         "Create high-quality, fair, and valid assessments. "
         "All distractors (wrong answers) must be plausible but clearly incorrect to students who mastered the material. "
         "Avoid trick questions, double negatives, and 'all of the above' options. "
-        "Write in plain text ONLY — no markdown, no asterisks, no hashtags."
+        + ("When source material is provided, ALL questions must come directly from that content. " if req.source_material.strip() else "")
+        + "Write in plain text ONLY — no markdown, no asterisks, no hashtags."
     )
 
     user_prompt = (
@@ -452,7 +515,8 @@ def generate_mc_assessment(req: MCAssessmentRequest):
         f"BLOOM'S TAXONOMY FOCUS: {blooms_map.get(req.blooms_level, blooms_map['mixed'])}\n"
         f"QUESTION FORMAT: {format_map.get(req.question_format, format_map['pure_mc'])}\n"
         f"{'STANDARDS: ' + req.standards if req.standards else ''}\n"
-        f"{'ADDITIONAL INSTRUCTIONS: ' + req.additional_instructions if req.additional_instructions else ''}\n\n"
+        f"{'ADDITIONAL INSTRUCTIONS: ' + req.additional_instructions if req.additional_instructions else ''}\n"
+        f"{mc_material_note}\n"
         "FORMAT REQUIREMENTS (plain text only):\n"
         "- Assessment title in ALL CAPS\n"
         "- Name / Date / Score fields\n"
@@ -488,17 +552,24 @@ def auto_generate(req: AutoGenerateRequest):
         "mixed":           "a balanced mix of fill-in-the-blank, multiple choice, and open-ended questions",
         "qa":              "question and answer pairs formatted as 'Q: [question]' then 'A: [answer]' on separate lines",
     }
+    auto_material_note = (
+        f"\n\nTEACHER-UPLOADED SOURCE MATERIAL (base content on this):\n---\n{req.source_material[:4000]}\n---\n"
+        if req.source_material.strip() else ""
+    )
+
     ws_system = (
         f"You are an expert classroom teacher creating a worksheet for {req.grade_level} students. "
         f"{lang} "
-        "Write in plain text ONLY — no markdown, no asterisks, no hashtags. "
+        + ("Base all questions on the provided source material. " if req.source_material.strip() else "")
+        + "Write in plain text ONLY — no markdown, no asterisks, no hashtags. "
         "Use CAPITAL LETTERS for section headers."
     )
     ws_user = (
         f"Create a complete classroom worksheet for {req.grade_level} students.\n\n"
         f"TOPIC: {req.topic}\nSUBJECT: {req.subject}\n"
         f"QUESTION TYPE: {type_map.get(req.worksheet_type, type_map['mixed'])}\n"
-        f"NUMBER OF QUESTIONS: {req.num_questions}\n\n"
+        f"NUMBER OF QUESTIONS: {req.num_questions}\n"
+        f"{auto_material_note}\n"
         "Include: worksheet title in ALL CAPS, Name/Date/Class lines, student instructions, "
         "numbered questions, and an ANSWER KEY at the bottom with rationales.\n"
         "Plain text only. No **, ##, or any markdown."
@@ -560,7 +631,8 @@ def auto_generate(req: AutoGenerateRequest):
     mc_user = (
         f"Create a {req.num_questions}-question assessment:\n\n"
         f"TOPIC: {req.topic}\nSUBJECT: {req.subject}\nGRADE LEVEL: {req.grade_level}\n"
-        f"FORMAT: {format_map.get(req.mc_format, format_map['pure_mc'])}\n\n"
+        f"FORMAT: {format_map.get(req.mc_format, format_map['pure_mc'])}\n"
+        f"{auto_material_note}\n"
         "Include: title in ALL CAPS, Name/Date/Score fields, student instructions, "
         "numbered questions, and ANSWER KEY with one-sentence explanations per answer.\n"
         "Plain text only. No **, ##, or any markdown."
