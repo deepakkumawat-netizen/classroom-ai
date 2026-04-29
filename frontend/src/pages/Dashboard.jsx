@@ -219,6 +219,23 @@ const tools = [
     features: ['4-option questions', 'Answer key included', 'Difficulty levels', 'Standards-aligned'],
     time: '~12 seconds',
   },
+  {
+    to: '/quiz-generator',
+    color: '#a855f7',
+    bg: '#f5f0ff',
+    border: '#d8b4fe',
+    icon: (
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#a855f7" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="10"/>
+        <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
+        <line x1="12" y1="17" x2="12.01" y2="17"/>
+      </svg>
+    ),
+    title: 'Quiz Generator',
+    desc: 'Play an interactive quiz with voice input, instant scoring, chat history, and PDF download — for any subject and grade.',
+    features: ['Voice input', 'Instant scoring', 'PDF download', 'Chat history'],
+    time: '~10 seconds',
+  },
 ]
 
 const stats = [
@@ -290,15 +307,15 @@ export default function Dashboard() {
         <div style={{ fontSize: 44, flexShrink: 0 }}>⚡</div>
         <div style={{ flex: 1 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
-            <span style={{ fontSize: 18, fontWeight: 800, letterSpacing: '-0.3px' }}>Auto Generate — All 3 Tools at Once</span>
+            <span style={{ fontSize: 18, fontWeight: 800, letterSpacing: '-0.3px' }}>Auto Generate — All 4 Tools at Once</span>
             <span style={{ fontSize: 10, fontWeight: 800, background: 'rgba(255,255,255,0.25)', padding: '2px 10px', borderRadius: 100, textTransform: 'uppercase', letterSpacing: '0.6px' }}>NEW</span>
           </div>
           <p style={{ fontSize: 14, opacity: 0.9, margin: 0, lineHeight: 1.55 }}>
-            Select grade + subject + topic once → get a Lesson Plan, Worksheet &amp; MC Assessment in one click.
+            Select grade + subject + topic once → get a Lesson Plan, Worksheet, MC Assessment &amp; Quiz in one click.
             Language automatically adjusts for each grade level. Powered by MCP automation.
           </p>
           <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
-            {['Auto language adjustment', 'Parallel generation', 'MCP-powered', '3 tools in ~30s'].map(f => (
+            {['Auto language adjustment', 'Parallel generation', 'MCP-powered', '4 tools in ~30s'].map(f => (
               <span key={f} style={{ fontSize: 11, fontWeight: 700, background: 'rgba(255,255,255,0.2)', padding: '3px 10px', borderRadius: 100 }}>{f}</span>
             ))}
           </div>
@@ -309,7 +326,7 @@ export default function Dashboard() {
       {/* Tool Cards */}
       <div style={{ marginBottom: 12 }}>
         <h2 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-1)', marginBottom: 16 }}>Individual Tools</h2>
-        <div className="grid-3 fade-up-2">
+        <div className="grid-3 fade-up-2" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
           {tools.map((tool, i) => (
             <div
               key={i}
