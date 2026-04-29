@@ -3,10 +3,13 @@ import { useLocation } from 'react-router-dom'
 import ThemeToggle from './ThemeToggle'
 
 const titles = {
-  '/':             { label: 'Dashboard',              sub: 'Welcome back! Choose a tool to get started.' },
-  '/worksheet':    { label: 'Worksheet Generator',    sub: 'Generate ready-to-use worksheets for any topic.' },
-  '/lesson-plan':  { label: 'Lesson Plan Generator',  sub: 'Create comprehensive lesson plans in seconds.' },
-  '/mc-assessment':{ label: 'MC Quiz / Assessment',   sub: 'Build multiple choice quizzes aligned to your standards.' },
+  '/':               { label: 'Dashboard',              sub: 'Welcome back! Choose a tool to get started.' },
+  '/worksheet':      { label: 'Worksheet Generator',    sub: 'Generate ready-to-use worksheets for any topic.' },
+  '/lesson-plan':    { label: 'Lesson Plan Generator',  sub: 'Create comprehensive lesson plans in seconds.' },
+  '/mc-assessment':  { label: 'MC Quiz / Assessment',   sub: 'Build multiple choice quizzes aligned to your standards.' },
+  '/quiz-generator': { label: 'Quiz Generator',         sub: 'Generate interactive quizzes and test student knowledge.' },
+  '/auto-generate':  { label: 'Auto Generate',          sub: 'One click — Lesson Plan + Worksheet + MC Assessment + Quiz.' },
+  '/teacher-insights':{ label: 'Teacher Insights',      sub: 'Analytics and insights from your classroom activity.' },
 }
 
 export default function Header() {

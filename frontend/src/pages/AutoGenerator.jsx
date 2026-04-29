@@ -268,7 +268,7 @@ export default function AutoGenerator() {
   })
   const [customTopic, setCustomTopic] = useState('')
   const [topicSource, setTopicSource] = useState('dropdown') // 'dropdown' | 'custom'
-  const [results, setResults] = useState({ worksheet: '', lesson_plan: '', mc_assessment: '' })
+  const [results, setResults] = useState({ worksheet: '', lesson_plan: '', mc_assessment: '', quiz: '' })
   const [loading, setLoading] = useState(false)
   const [activeTab, setActiveTab] = useState('lesson_plan')
   const [showHistory, setShowHistory] = useState(false)
@@ -351,7 +351,7 @@ export default function AutoGenerator() {
   const generate = async () => {
     if (!validate()) return
     setLoading(true)
-    setResults({ worksheet: '', lesson_plan: '', mc_assessment: '' })
+    setResults({ worksheet: '', lesson_plan: '', mc_assessment: '', quiz: '' })
     setTimeTaken(null)
     const start = Date.now()
 
@@ -375,17 +375,51 @@ export default function AutoGenerator() {
     }
 
     try {
-      const res = await fetch(`${API}/api/auto-generate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...form, topic: activeTopic, source_material: sourceMaterial }),
-      })
+      // Run auto-generate and quiz generation in parallel
+      const [res, quizRes] = await Promise.all([
+        fetch(`${API}/api/auto-generate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...form, topic: activeTopic, source_material: sourceMaterial }),
+        }),
+        fetch(`${API}/api/quiz`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            topic: activeTopic,
+            grade_level: form.grade_level,
+            subject: form.subject,
+            num_questions: Math.min(form.num_questions, 10),
+            difficulty: 'medium',
+          }),
+        }),
+      ])
       const data = await res.json()
       if (!res.ok) throw new Error(data.detail || 'Generation failed')
+
+      // Format quiz JSON as readable text for OutputBox
+      let quizText = ''
+      try {
+        if (quizRes.ok) {
+          const quizData = await quizRes.json()
+          quizText = `# ${quizData.title}\n`
+          quizText += `Grade: ${form.grade_level} | Subject: ${form.subject} | Difficulty: medium\n\n`
+          quizData.questions?.forEach((q, i) => {
+            quizText += `${i + 1}. ${q.question}\n`
+            q.options?.forEach((opt, j) => {
+              const letter = ['A','B','C','D'][j]
+              quizText += `   ${letter}) ${opt.replace(/^[A-D]\)\s*/i, '')}\n`
+            })
+            quizText += `   **Answer: ${q.correct}**\n   Explanation: ${q.explanation}\n\n`
+          })
+        }
+      } catch {}
+
       const newResults = {
         worksheet:     data.worksheet,
         lesson_plan:   data.lesson_plan,
         mc_assessment: data.mc_assessment,
+        quiz:          quizText,
       }
       setResults(newResults)
 
@@ -437,12 +471,13 @@ export default function AutoGenerator() {
     }
   }
 
-  const hasResults = results.lesson_plan || results.worksheet || results.mc_assessment
+  const hasResults = results.lesson_plan || results.worksheet || results.mc_assessment || results.quiz
 
   const tabList = [
     { key: 'lesson_plan',   label: 'Lesson Plan',   emoji: '📋' },
     { key: 'worksheet',     label: 'Worksheet',     emoji: '📝' },
     { key: 'mc_assessment', label: 'MC Assessment', emoji: '✅' },
+    { key: 'quiz',          label: 'Quiz',          emoji: '🎯' },
   ]
 
   return (
@@ -469,11 +504,11 @@ export default function AutoGenerator() {
             }}>⚡</div>
             <div>
               <h1 style={{ fontSize: 22, fontWeight: 700, color: 'var(--text-1)', margin: 0, display: 'flex', alignItems: 'center', gap: 12 }}>
-                Auto Generate — All 3 Tools
+                Auto Generate — All 4 Tools
                 <UsageCounter ref={usageCounterRef} teacherId={TEACHER_ID} toolName="auto-generate" />
               </h1>
               <p style={{ color: 'var(--text-2)', margin: 0, fontSize: 14 }}>
-                One click · Lesson Plan + Worksheet + MC Assessment · Language auto-adjusted by grade
+                One click · Lesson Plan + Worksheet + MC Assessment + Quiz · Language auto-adjusted by grade
               </p>
             </div>
           </div>
@@ -744,8 +779,8 @@ export default function AutoGenerator() {
           }}
         >
           {loading
-            ? <><span className="spinner" style={{ width: 18, height: 18 }} /> Generating all 3 tools...</>
-            : <>⚡ Generate All 3 Tools at Once</>
+            ? <><span className="spinner" style={{ width: 18, height: 18 }} /> Generating all 4 tools...</>
+            : <>⚡ Generate All 4 Tools at Once</>
           }
         </button>
       </div>
@@ -758,7 +793,7 @@ export default function AutoGenerator() {
             Generating your materials...
           </div>
           <div style={{ fontSize: 13, color: 'var(--text-2)' }}>
-            Creating Lesson Plan, Worksheet &amp; MC Assessment for {activeTopic || form.topic}
+            Creating Lesson Plan, Worksheet, MC Assessment &amp; Quiz for {activeTopic || form.topic}
           </div>
         </div>
       )}
