@@ -221,11 +221,11 @@ const tools = [
   },
   {
     to: '/quiz-generator',
-    color: '#a855f7',
-    bg: '#f5f0ff',
-    border: '#d8b4fe',
+    color: '#399aff',
+    bg: '#eef6ff',
+    border: '#bdd9ff',
     icon: (
-      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#a855f7" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#399aff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
         <circle cx="12" cy="12" r="10"/>
         <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
         <line x1="12" y1="17" x2="12.01" y2="17"/>
