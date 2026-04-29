@@ -1103,6 +1103,67 @@ async def get_teacher_insights(data: dict):
         print(f"[ERROR] Teacher insights error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+
+# ─── INTERACTIVE QUIZ GENERATOR ────────────────────────
+
+class QuizRequest(BaseModel):
+    topic: str
+    grade_level: str
+    subject: str = ""
+    num_questions: int = 5
+    difficulty: str = "medium"
+
+@app.post("/api/quiz")
+async def generate_quiz(request: QuizRequest):
+    if not request.topic.strip():
+        raise HTTPException(status_code=400, detail="Topic cannot be empty")
+    grade_profile = get_grade_language_profile(request.grade_level)
+    prompt = f"""Generate {request.num_questions} multiple choice quiz questions about "{request.topic}" for {request.grade_level} students.
+{f'Subject: {request.subject}' if request.subject else ''}
+Difficulty: {request.difficulty}
+{grade_profile}
+
+Return ONLY valid JSON (no markdown):
+{{
+  "title": "<Quiz title>",
+  "questions": [
+    {{
+      "id": 1,
+      "question": "<Question text>",
+      "options": ["A) <option>", "B) <option>", "C) <option>", "D) <option>"],
+      "correct": "A",
+      "explanation": "<Why this answer is correct, 1-2 sentences>"
+    }}
+  ]
+}}
+
+Rules:
+- correct must be A, B, C, or D
+- All 4 options must be plausible (no obviously wrong answers)
+- explanation must be educational and friendly
+- questions must be appropriate for grade level
+- Use simple language for younger grades"""
+
+    try:
+        completion = client.chat.completions.create(
+            messages=[
+                {"role": "system", "content": "You are a quiz generator. Always respond with valid JSON only. No markdown."},
+                {"role": "user", "content": prompt},
+            ],
+            model="gpt-4o-mini", temperature=0.5, max_tokens=2048,
+        )
+        import re as _re
+        text = completion.choices[0].message.content.strip()
+        text = _re.sub(r'^```[a-z]*\s*', '', text)
+        text = _re.sub(r'\s*```$', '', text).strip()
+        data = json.loads(text)
+        return data
+    except json.JSONDecodeError as e:
+        raise HTTPException(status_code=500, detail=f"Failed to parse quiz JSON: {str(e)}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # ─── SERVE FRONTEND ────────────────────────────────────
 
 FRONTEND_DIST = Path(__file__).parent.parent / "frontend" / "dist"
