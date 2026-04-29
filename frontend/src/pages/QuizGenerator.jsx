@@ -10,6 +10,55 @@ const grades    = ['Kindergarten','Grade 1','Grade 2','Grade 3','Grade 4','Grade
 const subjects  = ['Mathematics','Science','English Language Arts','Social Studies','History','Geography','Physics','Chemistry','Biology','Computer Science','Art','Music','Other']
 const OPTION_COLORS = { A: '#3b82f6', B: '#10b981', C: '#f59e0b', D: '#ef4444' }
 
+function SelectDown({ value, onChange, options }) {
+  const [open, setOpen] = React.useState(false)
+  const ref = React.useRef(null)
+  React.useEffect(() => {
+    if (!open) return
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [open])
+  const selected = options.find(o => (o.value ?? o) === value)
+  const label = selected ? (selected.label ?? selected) : value
+  return (
+    <div ref={ref} style={{ position: 'relative', width: '100%' }}>
+      <button type="button" onClick={() => setOpen(o => !o)}
+        style={{ width: '100%', padding: '10px 14px', border: '1.5px solid var(--border)', borderRadius: 10,
+          fontFamily: 'inherit', fontSize: '0.9rem', color: 'var(--text-1)', background: 'var(--bg)',
+          cursor: 'pointer', textAlign: 'left', display: 'flex', justifyContent: 'space-between',
+          alignItems: 'center', outline: 'none' }}>
+        <span>{label}</span>
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
+          strokeLinecap="round" style={{ flexShrink: 0, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }}>
+          <polyline points="6 9 12 15 18 9"/>
+        </svg>
+      </button>
+      {open && (
+        <ul style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, zIndex: 9999,
+          background: 'var(--bg)', border: '1.5px solid var(--border)', borderRadius: 10,
+          maxHeight: 220, overflowY: 'auto', padding: '4px 0', margin: 0, listStyle: 'none',
+          boxShadow: '0 8px 28px rgba(0,0,0,0.18)' }}>
+          {options.map((opt) => {
+            const v = opt.value ?? opt
+            const l = opt.label ?? opt
+            const active = v === value
+            return (
+              <li key={v} onMouseDown={() => { onChange(v); setOpen(false) }}
+                style={{ padding: '9px 14px', cursor: 'pointer', fontSize: '0.9rem',
+                  color: active ? 'var(--accent)' : 'var(--text-1)',
+                  background: active ? 'var(--accent-soft)' : 'transparent',
+                  fontWeight: active ? 600 : 400 }}>
+                {l}
+              </li>
+            )
+          })}
+        </ul>
+      )}
+    </div>
+  )
+}
+
 function VoiceBtn({ onResult }) {
   const [listening, setListening] = useState(false)
   const recRef = useRef(null)
@@ -297,19 +346,11 @@ export default function QuizGenerator() {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
           <div>
             <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-2)', textTransform: 'uppercase', letterSpacing: 1, display: 'block', marginBottom: 8 }}>Grade Level</label>
-            <select value={grade} onChange={e => setGrade(e.target.value)}
-              style={{ width: '100%', padding: '10px 14px', border: '1.5px solid var(--border)', borderRadius: 10,
-                fontFamily: 'inherit', fontSize: '0.9rem', color: 'var(--text-1)', background: 'var(--bg)', outline: 'none', cursor: 'pointer' }}>
-              {grades.map(g => <option key={g} value={g}>{g}</option>)}
-            </select>
+            <SelectDown value={grade} onChange={setGrade} options={grades} />
           </div>
           <div>
             <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-2)', textTransform: 'uppercase', letterSpacing: 1, display: 'block', marginBottom: 8 }}>Subject</label>
-            <select value={subject} onChange={e => setSubject(e.target.value)}
-              style={{ width: '100%', padding: '10px 14px', border: '1.5px solid var(--border)', borderRadius: 10,
-                fontFamily: 'inherit', fontSize: '0.9rem', color: 'var(--text-1)', background: 'var(--bg)', outline: 'none', cursor: 'pointer' }}>
-              {subjects.map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
+            <SelectDown value={subject} onChange={setSubject} options={subjects} />
           </div>
         </div>
 
@@ -317,21 +358,13 @@ export default function QuizGenerator() {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
           <div>
             <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-2)', textTransform: 'uppercase', letterSpacing: 1, display: 'block', marginBottom: 8 }}>Number of Questions</label>
-            <select value={numQ} onChange={e => setNumQ(Number(e.target.value))}
-              style={{ width: '100%', padding: '10px 14px', border: '1.5px solid var(--border)', borderRadius: 10,
-                fontFamily: 'inherit', fontSize: '0.9rem', color: 'var(--text-1)', background: 'var(--bg)', outline: 'none', cursor: 'pointer' }}>
-              {[3,5,8,10,15].map(n => <option key={n} value={n}>{n} questions</option>)}
-            </select>
+            <SelectDown value={numQ} onChange={v => setNumQ(Number(v))}
+              options={[3,5,8,10,15].map(n => ({ value: n, label: `${n} questions` }))} />
           </div>
           <div>
             <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-2)', textTransform: 'uppercase', letterSpacing: 1, display: 'block', marginBottom: 8 }}>Difficulty</label>
-            <select value={difficulty} onChange={e => setDifficulty(e.target.value)}
-              style={{ width: '100%', padding: '10px 14px', border: '1.5px solid var(--border)', borderRadius: 10,
-                fontFamily: 'inherit', fontSize: '0.9rem', color: 'var(--text-1)', background: 'var(--bg)', outline: 'none', cursor: 'pointer' }}>
-              <option value="easy">Easy</option>
-              <option value="medium">Medium</option>
-              <option value="hard">Hard</option>
-            </select>
+            <SelectDown value={difficulty} onChange={setDifficulty}
+              options={[{ value: 'easy', label: 'Easy' }, { value: 'medium', label: 'Medium' }, { value: 'hard', label: 'Hard' }]} />
           </div>
         </div>
 
