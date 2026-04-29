@@ -1,9 +1,0 @@
-[build]
-builder = "dockerfile"
-
-[build.args]
-PYTHON_VERSION = "3.11"
-NODE_VERSION = "18"
-
-[deploy]
-startCommand = "python backend/main.py"
