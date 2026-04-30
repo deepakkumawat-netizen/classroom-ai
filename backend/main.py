@@ -947,7 +947,7 @@ async def generate_adaptive_question(data: dict):
         Include 4 multiple choice options and mark the correct answer."""
 
         response = client.chat.completions.create(
-            model=OPENAI_MODEL,
+            model="gpt-4",
             messages=[
                 {"role": "system", "content": "You are an expert educator. Generate a clear, engaging educational question."},
                 {"role": "user", "content": prompt}
