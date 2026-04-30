@@ -43,9 +43,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434/v1")
-OLLAMA_MODEL    = os.getenv("OLLAMA_MODEL", "llama3.2:3b")
-client = OpenAI(base_url=OLLAMA_BASE_URL, api_key="ollama")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+OPENAI_MODEL   = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+client = OpenAI(api_key=OPENAI_API_KEY)
 
 # ─── MODELS ───────────────────────────────────────────
 
@@ -186,7 +186,7 @@ def get_grade_language_profile(grade_level: str) -> str:
 def call_openai(system_prompt: str, user_prompt: str, max_tokens: int = 3500) -> str:
     try:
         response = client.chat.completions.create(
-            model=OLLAMA_MODEL,
+            model=OPENAI_MODEL,
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user",   "content": user_prompt},
@@ -947,7 +947,7 @@ async def generate_adaptive_question(data: dict):
         Include 4 multiple choice options and mark the correct answer."""
 
         response = client.chat.completions.create(
-            model=OLLAMA_MODEL,
+            model=OPENAI_MODEL,
             messages=[
                 {"role": "system", "content": "You are an expert educator. Generate a clear, engaging educational question."},
                 {"role": "user", "content": prompt}
@@ -1150,7 +1150,7 @@ Rules:
                 {"role": "system", "content": "You are a quiz generator. Always respond with valid JSON only. No markdown."},
                 {"role": "user", "content": prompt},
             ],
-            model=OLLAMA_MODEL, temperature=0.5, max_tokens=2048,
+            model=OPENAI_MODEL, temperature=0.5, max_tokens=2048,
         )
         import re as _re
         text = completion.choices[0].message.content.strip()
