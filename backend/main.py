@@ -43,7 +43,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434/v1")
+OLLAMA_MODEL    = os.getenv("OLLAMA_MODEL", "llama3.2:3b")
+client = OpenAI(base_url=OLLAMA_BASE_URL, api_key="ollama")
 
 # ─── MODELS ───────────────────────────────────────────
 
@@ -184,7 +186,7 @@ def get_grade_language_profile(grade_level: str) -> str:
 def call_openai(system_prompt: str, user_prompt: str, max_tokens: int = 3500) -> str:
     try:
         response = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model=OLLAMA_MODEL,
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user",   "content": user_prompt},
@@ -194,7 +196,7 @@ def call_openai(system_prompt: str, user_prompt: str, max_tokens: int = 3500) ->
         )
         return response.choices[0].message.content.strip()
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"OpenAI API error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"AI error: {str(e)}")
 
 # ─── ROUTES ───────────────────────────────────────────
 
@@ -944,10 +946,8 @@ async def generate_adaptive_question(data: dict):
         Difficulty: {suggested_difficulty} (0=easy, 1=hard)
         Include 4 multiple choice options and mark the correct answer."""
 
-        # Call OpenAI to generate question
-        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
         response = client.chat.completions.create(
-            model="gpt-4",
+            model=OLLAMA_MODEL,
             messages=[
                 {"role": "system", "content": "You are an expert educator. Generate a clear, engaging educational question."},
                 {"role": "user", "content": prompt}
@@ -1150,7 +1150,7 @@ Rules:
                 {"role": "system", "content": "You are a quiz generator. Always respond with valid JSON only. No markdown."},
                 {"role": "user", "content": prompt},
             ],
-            model="gpt-4o-mini", temperature=0.5, max_tokens=2048,
+            model=OLLAMA_MODEL, temperature=0.5, max_tokens=2048,
         )
         import re as _re
         text = completion.choices[0].message.content.strip()
