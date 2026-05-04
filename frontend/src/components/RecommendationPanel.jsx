@@ -12,7 +12,8 @@ export default function RecommendationPanel({ studentId, teacherId }) {
 
   const fetchRecommendations = async () => {
     try {
-      const response = await fetch('http://localhost:8001/api/adaptive/recommend-next', {
+      const apiBase = window.location.hostname === 'localhost' ? 'http://localhost:8001' : window.location.origin
+      const response = await fetch(`${apiBase}/api/adaptive/recommend-next`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
