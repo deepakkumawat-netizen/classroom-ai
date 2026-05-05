@@ -37,7 +37,7 @@ export default function AdaptiveProgressTracker({ studentId, teacherId }) {
   };
 
   if (loading) return <div className="progress-loading">Loading progress...</div>;
-  if (error) return <div className="progress-error">Error: {error}</div>;
+  if (error) return null;
   if (!progress) return null;
 
   return (

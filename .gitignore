@@ -32,6 +32,8 @@ env/
 node_modules/
 /build
 /dist
+!frontend/dist
+!frontend/dist/**
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*

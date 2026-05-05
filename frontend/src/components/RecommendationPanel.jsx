@@ -48,7 +48,7 @@ export default function RecommendationPanel({ studentId, teacherId }) {
   };
 
   if (loading) return <div className="rec-loading">Finding personalized recommendations...</div>;
-  if (error) return <div className="rec-error">Error: {error}</div>;
+  if (error) return null;
 
   return (
     <div className="recommendation-panel">
