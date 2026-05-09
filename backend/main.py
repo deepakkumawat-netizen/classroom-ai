@@ -43,9 +43,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-OPENAI_API_KEY = os.getenv("GROQ_API_KEY", "").strip() or "missing-set-GROQ_API_KEY-in-env"
-OPENAI_MODEL   = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
-client = OpenAI(api_key=OPENAI_API_KEY, base_url="https://api.groq.com/openai/v1")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "").strip() or "missing-set-OPENAI_API_KEY-in-env"
+OPENAI_MODEL   = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+client = OpenAI(api_key=OPENAI_API_KEY)
 
 # ─── MODELS ───────────────────────────────────────────
 
@@ -183,7 +183,7 @@ def get_grade_language_profile(grade_level: str) -> str:
     return "LANGUAGE LEVEL: Use clear, age-appropriate language for the specified grade level."
 
 
-def call_openai(system_prompt: str, user_prompt: str, max_tokens: int = 3500) -> str:
+def call_openai(system_prompt: str, user_prompt: str, max_tokens: int = 1800) -> str:
     try:
         response = client.chat.completions.create(
             model=OPENAI_MODEL,
@@ -374,7 +374,7 @@ def generate_lesson_plan(req: LessonPlanRequest):
             "Write in plain text. No **, ##, or markdown."
         )
 
-        topic_overview = call_openai(topic_system, topic_prompt, max_tokens=2500)
+        topic_overview = call_openai(topic_system, topic_prompt, max_tokens=1500)
         topic_overview = "=== PAGE 1: TOPIC OVERVIEW ===\n\n" + topic_overview + "\n\n" + "="*50 + "\n\n=== PAGE 2: LESSON PLAN ===\n\n"
 
     lesson_material_note = ""
@@ -449,7 +449,7 @@ def generate_lesson_plan(req: LessonPlanRequest):
         f"{lesson_material_note}"
     )
 
-    lesson_result = call_openai(system_prompt, user_prompt, max_tokens=4000)
+    lesson_result = call_openai(system_prompt, user_prompt, max_tokens=2000)
     result = topic_overview + lesson_result
     return {"result": result, "tool": "lesson-plan"}
 
@@ -531,7 +531,7 @@ def generate_mc_assessment(req: MCAssessmentRequest):
         "Write everything in plain text. No **, ##, or any markdown."
     )
 
-    result = call_openai(system_prompt, user_prompt, max_tokens=3500)
+    result = call_openai(system_prompt, user_prompt, max_tokens=1800)
     return {"result": result, "tool": "mc-assessment"}
 
 
@@ -640,16 +640,11 @@ def auto_generate(req: AutoGenerateRequest):
         "Plain text only. No **, ##, or any markdown."
     )
 
-    # ── Run all 4 in parallel ──────────────────────────
-    with ThreadPoolExecutor(max_workers=4) as pool:
-        f_ov = pool.submit(call_openai, ov_system, ov_user, 2500)
-        f_lp = pool.submit(call_openai, lp_system, lp_user, 3500)
-        f_ws = pool.submit(call_openai, ws_system, ws_user, 2500)
-        f_mc = pool.submit(call_openai, mc_system, mc_user, 2500)
-        topic_overview = f_ov.result()
-        lesson_content = f_lp.result()
-        worksheet      = f_ws.result()
-        mc_assessment  = f_mc.result()
+    # ── Run sequentially to stay within Groq free-tier rate limits ────────────
+    topic_overview = call_openai(ov_system, ov_user, 1200)
+    lesson_content = call_openai(lp_system, lp_user, 1500)
+    worksheet      = call_openai(ws_system, ws_user, 1200)
+    mc_assessment  = call_openai(mc_system, mc_user, 1200)
 
     # Combine overview + lesson plan (matching the Lesson Plan Generator format)
     lesson_plan = (
