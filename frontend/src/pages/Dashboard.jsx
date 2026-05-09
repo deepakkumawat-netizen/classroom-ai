@@ -257,7 +257,7 @@ export default function Dashboard() {
         padding: '32px 32px',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-          <span style={{ fontSize: '0.75rem', fontWeight: 700, background: 'rgba(255,255,255,0.2)', padding: '3px 12px', borderRadius: 100, letterSpacing: '0.5px', textTransform: 'uppercase' }}>✦ AI Powered</span>
+          <span style={{ fontSize: '0.75rem', fontWeight: 700, background: 'rgba(255,255,255,0.2)', padding: '3px 12px', borderRadius: 100, letterSpacing: '0.5px', textTransform: 'uppercase' }}>✦ Groq Powered</span>
         </div>
         <h1 style={{ fontSize: '1.9rem', fontWeight: 800, marginBottom: 8, letterSpacing: '-0.5px', lineHeight: 1.2 }}>
           Welcome to ClassroomAI
