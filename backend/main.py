@@ -641,10 +641,10 @@ def auto_generate(req: AutoGenerateRequest):
     )
 
     # ── Run sequentially to stay within Groq free-tier rate limits ────────────
-    topic_overview = call_openai(ov_system, ov_user, 1200)
-    lesson_content = call_openai(lp_system, lp_user, 1500)
-    worksheet      = call_openai(ws_system, ws_user, 1200)
-    mc_assessment  = call_openai(mc_system, mc_user, 1200)
+    topic_overview = call_openai(ov_system, ov_user, 800)
+    lesson_content = call_openai(lp_system, lp_user, 900)
+    worksheet      = call_openai(ws_system, ws_user, 800)
+    mc_assessment  = call_openai(mc_system, mc_user, 800)
 
     # Combine overview + lesson plan (matching the Lesson Plan Generator format)
     lesson_plan = (
@@ -1145,7 +1145,7 @@ Rules:
                 {"role": "system", "content": "You are a quiz generator. Always respond with valid JSON only. No markdown."},
                 {"role": "user", "content": prompt},
             ],
-            model=OPENAI_MODEL, temperature=0.5, max_tokens=2048,
+            model=OPENAI_MODEL, temperature=0.5, max_tokens=1000,
         )
         import re as _re
         text = completion.choices[0].message.content.strip()
