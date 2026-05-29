@@ -3,7 +3,7 @@ import { NavLink, useLocation } from 'react-router-dom'
 
 const nav = [
   {
-    to: '/',
+    to: '/dashboard',
     icon: (
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
@@ -64,6 +64,15 @@ const nav = [
       </svg>
     ),
     label: 'Quiz Generator 🎯',
+  },
+  {
+    to: '/history',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l4 2"/>
+      </svg>
+    ),
+    label: 'History',
   },
 ]
 

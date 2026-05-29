@@ -183,7 +183,7 @@ def get_grade_language_profile(grade_level: str) -> str:
     return "LANGUAGE LEVEL: Use clear, age-appropriate language for the specified grade level."
 
 
-def call_openai(system_prompt: str, user_prompt: str, max_tokens: int = 1800) -> str:
+def call_openai(system_prompt: str, user_prompt: str, max_tokens: int = 1000) -> str:
     try:
         response = client.chat.completions.create(
             model=OPENAI_MODEL,
