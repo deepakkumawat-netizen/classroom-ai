@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react'
 import OutputBox from '../components/OutputBox'
 import CustomSelect from '../components/CustomSelect'
+import CurriculumPicker from '../components/CurriculumPicker'
 import ChatHistory from '../components/ChatHistory'
 import UsageCounter from '../components/UsageCounter'
 import ErrorToast from '../components/ErrorToast'
@@ -385,6 +386,18 @@ export default function WorksheetGenerator() {
 
         <div style={FORM_BODY}>
           <div style={{ height: 8 }}/>
+
+          {/* CBSE Curriculum Picker (Grade → Subject → Chapter) */}
+          <CurriculumPicker
+            grade={form.grade_level}
+            subject={form.subject}
+            topic={form.topic}
+            compact
+            onChange={({ grade, subject, topic }) => {
+              setForm(f => ({ ...f, grade_level: grade, subject, topic }))
+              setErrors(e => ({ ...e, grade_level: '', subject: '', topic: '' }))
+            }}
+          />
 
           {/* STEP 1 — Subject */}
           <div className="form-group">

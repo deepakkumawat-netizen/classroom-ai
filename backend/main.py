@@ -20,6 +20,21 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from database import db
 from mcp_tools import get_chat_history, check_usage_limit, increment_usage
+try:
+    from cbse_kb import (
+        CBSE_KB,
+        retrieve_context as cbse_retrieve,
+        get_subjects as cbse_subjects,
+        get_chapters as cbse_chapters,
+    )
+    CBSE_AVAILABLE = bool(CBSE_KB)
+except Exception as _e:
+    print(f"[WARN] CBSE KB unavailable: {_e}")
+    CBSE_KB = {}
+    CBSE_AVAILABLE = False
+    def cbse_retrieve(*a, **kw): return ""
+    def cbse_subjects(*a, **kw): return []
+    def cbse_chapters(*a, **kw): return []
 
 print("[DEBUG] All imports complete")
 load_dotenv()
@@ -183,6 +198,32 @@ def get_grade_language_profile(grade_level: str) -> str:
     return "LANGUAGE LEVEL: Use clear, age-appropriate language for the specified grade level."
 
 
+def cbse_curriculum_block(topic: str, grade_level: str, subject: str = "") -> str:
+    """Return a CBSE-grounding prompt block for the given topic / grade / subject.
+
+    If the CBSE knowledge base has matching chapters we list them so the LLM
+    aligns generated content with the official CBSE curriculum. If nothing
+    matches we still tell the model to stay CBSE-aligned for that grade.
+    """
+    if not CBSE_AVAILABLE:
+        return ""
+    ctx = cbse_retrieve(topic, grade_level, subject)
+    if ctx:
+        return (
+            "\n\n=== CBSE CURRICULUM GROUNDING (mandatory) ===\n"
+            f"{ctx}\n"
+            "Treat the above CBSE chapters as the authoritative scope. "
+            "Use the listed concepts, units and chapter framing. "
+            "Do NOT introduce content outside the CBSE syllabus for this grade.\n"
+            "=== END CBSE GROUNDING ===\n"
+        )
+    return (
+        f"\n\nCURRICULUM NOTE: Align content with the official CBSE syllabus for {grade_level}"
+        + (f" / {subject}" if subject else "")
+        + ". Use CBSE NCERT-style vocabulary, examples and chapter framing.\n"
+    )
+
+
 def call_openai(system_prompt: str, user_prompt: str, max_tokens: int = 1000) -> str:
     try:
         response = client.chat.completions.create(
@@ -199,6 +240,41 @@ def call_openai(system_prompt: str, user_prompt: str, max_tokens: int = 1000) ->
         raise HTTPException(status_code=500, detail=f"AI error: {str(e)}")
 
 # ─── ROUTES ───────────────────────────────────────────
+
+@app.get("/api/curriculum")
+def get_curriculum(grade: str = "", subject: str = ""):
+    """Return CBSE TOC for the dropdown pickers.
+
+    - No params: full {grade: {subject: [chapters]}} tree.
+    - grade only: {subjects: [...], chapters: {subject: [chapters]}} for that grade.
+    - grade + subject: {chapters: [...]} for that subject in that grade.
+    """
+    if not CBSE_AVAILABLE:
+        return {"grades": [], "available": False}
+
+    if not grade:
+        return {
+            "available": True,
+            "grades": sorted(CBSE_KB.keys(), key=lambda g: int("".join(c for c in g if c.isdigit()) or "0")),
+            "tree": CBSE_KB,
+        }
+
+    subjects = cbse_subjects(grade)
+    if not subject:
+        return {
+            "available": True,
+            "grade": grade,
+            "subjects": subjects,
+            "chapters": {s: cbse_chapters(grade, s) for s in subjects},
+        }
+
+    return {
+        "available": True,
+        "grade": grade,
+        "subject": subject,
+        "chapters": cbse_chapters(grade, subject),
+    }
+
 
 @app.post("/api/worksheet")
 def generate_worksheet(req: WorksheetRequest):
@@ -234,6 +310,9 @@ def generate_worksheet(req: WorksheetRequest):
     diff    = diff_map.get(req.differentiation_level, diff_map["grade-level"])
     blooms  = blooms_map.get(req.blooms_level, blooms_map["mixed"])
 
+    lang = get_grade_language_profile(req.grade_level)
+    cbse_block = cbse_curriculum_block(req.topic, req.grade_level, req.subject or "")
+
     word_bank_note = ""
     if req.include_word_bank and req.worksheet_type in ("fill_blank", "mixed"):
         word_bank_note = (
@@ -249,9 +328,10 @@ def generate_worksheet(req: WorksheetRequest):
         )
 
     system_prompt = (
-        "You are an expert classroom teacher and curriculum specialist with 20+ years of experience. "
-        "Create professional, print-ready worksheets that are engaging, pedagogically sound, and appropriately rigorous. "
+        "You are an expert CBSE classroom teacher and curriculum specialist with 20+ years of experience. "
+        "Create professional, print-ready worksheets aligned to the official CBSE / NCERT syllabus. "
         "Ensure questions are clear, unambiguous, and aligned to the specified grade level and Bloom's level. "
+        f"{lang} "
         + ("When source material is provided, derive ALL questions directly from that content. " if req.source_material.strip() else "")
         + "Write in plain text ONLY — absolutely no markdown, no asterisks, no hashtags, no bold symbols. "
         "Use CAPITAL LETTERS for section headers and dashes for separators."
@@ -268,6 +348,7 @@ def generate_worksheet(req: WorksheetRequest):
         f"{word_bank_note}\n"
         f"{'ADDITIONAL INSTRUCTIONS: ' + req.additional_instructions if req.additional_instructions else ''}\n"
         f"{material_note}\n"
+        f"{cbse_block}\n"
         "FORMAT REQUIREMENTS (plain text only, no markdown):\n"
         "- Worksheet title in ALL CAPS\n"
         "- Name / Date / Class lines\n"
@@ -320,6 +401,9 @@ async def upload_material(file: UploadFile = File(...)):
 def generate_lesson_plan(req: LessonPlanRequest):
     if not req.topic.strip():
         raise HTTPException(status_code=400, detail="Topic is required.")
+
+    lang = get_grade_language_profile(req.grade_level)
+    cbse_block = cbse_curriculum_block(req.topic, req.grade_level, req.subject or "")
 
     style_map = {
         "mixed":       "a variety of learning modalities (visual, auditory, and kinesthetic activities combined)",
@@ -385,10 +469,11 @@ def generate_lesson_plan(req: LessonPlanRequest):
         )
 
     system_prompt = (
-        "You are a master curriculum designer and instructional coach expert in UbD (Understanding by Design), "
+        "You are a master CBSE curriculum designer and instructional coach expert in UbD (Understanding by Design), "
         "differentiated instruction, and modern pedagogical best practices. "
-        "Create detailed, actionable, classroom-ready lesson plans any teacher can pick up and use immediately. "
+        "Create detailed, actionable, classroom-ready lesson plans aligned to the official CBSE / NCERT syllabus. "
         "Include specific timing estimates, concrete student activities, and teacher facilitation notes. "
+        f"{lang} "
         + ("When source material is provided, align ALL activities and content directly to it. " if req.source_material.strip() else "")
         + "Write in plain text ONLY — no markdown, no asterisks, no hashtags. "
         "Use numbered sections with UPPERCASE HEADERS."
@@ -447,6 +532,7 @@ def generate_lesson_plan(req: LessonPlanRequest):
         "    - Ideas for the follow-up lesson\n\n"
         "Write everything in plain text. No **, ##, or markdown formatting of any kind."
         f"{lesson_material_note}"
+        f"{cbse_block}"
     )
 
     lesson_result = call_openai(system_prompt, user_prompt, max_tokens=2000)
@@ -458,6 +544,9 @@ def generate_lesson_plan(req: LessonPlanRequest):
 def generate_mc_assessment(req: MCAssessmentRequest):
     if not req.topic.strip():
         raise HTTPException(status_code=400, detail="Topic is required.")
+
+    lang = get_grade_language_profile(req.grade_level)
+    cbse_block = cbse_curriculum_block(req.topic, req.grade_level, req.subject or "")
 
     blooms_map = {
         "remember":   "recall and recognition (define, identify, name, list) — Bloom's Level 1",
@@ -500,11 +589,12 @@ def generate_mc_assessment(req: MCAssessmentRequest):
         )
 
     system_prompt = (
-        "You are an expert assessment designer with deep knowledge of curriculum standards, "
+        "You are an expert CBSE assessment designer with deep knowledge of CBSE / NCERT curriculum standards, "
         "Bloom's Taxonomy, and best practices in test construction. "
-        "Create high-quality, fair, and valid assessments. "
+        "Create high-quality, fair, valid assessments aligned to the CBSE syllabus. "
         "All distractors (wrong answers) must be plausible but clearly incorrect to students who mastered the material. "
         "Avoid trick questions, double negatives, and 'all of the above' options. "
+        f"{lang} "
         + ("When source material is provided, ALL questions must come directly from that content. " if req.source_material.strip() else "")
         + "Write in plain text ONLY — no markdown, no asterisks, no hashtags."
     )
@@ -519,6 +609,7 @@ def generate_mc_assessment(req: MCAssessmentRequest):
         f"{'STANDARDS: ' + req.standards if req.standards else ''}\n"
         f"{'ADDITIONAL INSTRUCTIONS: ' + req.additional_instructions if req.additional_instructions else ''}\n"
         f"{mc_material_note}\n"
+        f"{cbse_block}\n"
         "FORMAT REQUIREMENTS (plain text only):\n"
         "- Assessment title in ALL CAPS\n"
         "- Name / Date / Score fields\n"
@@ -545,6 +636,7 @@ def auto_generate(req: AutoGenerateRequest):
         raise HTTPException(status_code=400, detail="Subject is required.")
 
     lang = get_grade_language_profile(req.grade_level)
+    cbse_block = cbse_curriculum_block(req.topic, req.grade_level, req.subject or "")
 
     # ── Worksheet ──────────────────────────────────────
     type_map = {
@@ -560,7 +652,7 @@ def auto_generate(req: AutoGenerateRequest):
     )
 
     ws_system = (
-        f"You are an expert classroom teacher creating a worksheet for {req.grade_level} students. "
+        f"You are an expert CBSE classroom teacher creating a worksheet for {req.grade_level} students aligned to the CBSE / NCERT syllabus. "
         f"{lang} "
         + ("Base all questions on the provided source material. " if req.source_material.strip() else "")
         + "Write in plain text ONLY — no markdown, no asterisks, no hashtags. "
@@ -572,6 +664,7 @@ def auto_generate(req: AutoGenerateRequest):
         f"QUESTION TYPE: {type_map.get(req.worksheet_type, type_map['mixed'])}\n"
         f"NUMBER OF QUESTIONS: {req.num_questions}\n"
         f"{auto_material_note}\n"
+        f"{cbse_block}\n"
         "Include: worksheet title in ALL CAPS, Name/Date/Class lines, student instructions, "
         "numbered questions, and an ANSWER KEY at the bottom with rationales.\n"
         "Plain text only. No **, ##, or any markdown."
@@ -584,8 +677,9 @@ def auto_generate(req: AutoGenerateRequest):
         "Write in plain text ONLY — no markdown, no asterisks, no hashtags."
     )
     ov_user = (
-        f"Create a comprehensive topic overview for teacher reference:\n\n"
-        f"TOPIC: {req.topic}\nSUBJECT: {req.subject}\nGRADE LEVEL: {req.grade_level}\n\n"
+        f"Create a comprehensive topic overview for teacher reference (CBSE-aligned):\n\n"
+        f"TOPIC: {req.topic}\nSUBJECT: {req.subject}\nGRADE LEVEL: {req.grade_level}\n"
+        f"{cbse_block}\n"
         "Include ALL sections below with concise but detailed content:\n\n"
         "1. OVERVIEW - What this topic is and why it matters at this grade level\n\n"
         "2. KEY CONCEPTS - 5-7 core ideas with simple definitions appropriate for the grade\n\n"
@@ -606,8 +700,9 @@ def auto_generate(req: AutoGenerateRequest):
         "Use numbered sections with UPPERCASE HEADERS."
     )
     lp_user = (
-        f"Create a complete 45-minute lesson plan:\n\n"
-        f"TOPIC: {req.topic}\nSUBJECT: {req.subject}\nGRADE LEVEL: {req.grade_level}\n\n"
+        f"Create a complete 45-minute CBSE-aligned lesson plan:\n\n"
+        f"TOPIC: {req.topic}\nSUBJECT: {req.subject}\nGRADE LEVEL: {req.grade_level}\n"
+        f"{cbse_block}\n"
         "Include: 1. LESSON OVERVIEW (objectives in SWBAT format, essential question, success criteria) "
         "2. MATERIALS AND RESOURCES 3. WARM-UP/HOOK (10 min) 4. DIRECT INSTRUCTION (15 min) "
         "5. GUIDED PRACTICE (10 min) 6. INDEPENDENT PRACTICE (7 min) "
@@ -631,10 +726,11 @@ def auto_generate(req: AutoGenerateRequest):
         "All wrong answer choices must be plausible but clearly incorrect to students who studied."
     )
     mc_user = (
-        f"Create a {req.num_questions}-question assessment:\n\n"
+        f"Create a {req.num_questions}-question CBSE-aligned assessment:\n\n"
         f"TOPIC: {req.topic}\nSUBJECT: {req.subject}\nGRADE LEVEL: {req.grade_level}\n"
         f"FORMAT: {format_map.get(req.mc_format, format_map['pure_mc'])}\n"
         f"{auto_material_note}\n"
+        f"{cbse_block}\n"
         "Include: title in ALL CAPS, Name/Date/Score fields, student instructions, "
         "numbered questions, and ANSWER KEY with one-sentence explanations per answer.\n"
         "Plain text only. No **, ##, or any markdown."
@@ -1113,10 +1209,12 @@ async def generate_quiz(request: QuizRequest):
     if not request.topic.strip():
         raise HTTPException(status_code=400, detail="Topic cannot be empty")
     grade_profile = get_grade_language_profile(request.grade_level)
-    prompt = f"""Generate {request.num_questions} multiple choice quiz questions about "{request.topic}" for {request.grade_level} students.
+    cbse_block = cbse_curriculum_block(request.topic, request.grade_level, request.subject or "")
+    prompt = f"""Generate {request.num_questions} CBSE-aligned multiple choice quiz questions about "{request.topic}" for {request.grade_level} students.
 {f'Subject: {request.subject}' if request.subject else ''}
 Difficulty: {request.difficulty}
 {grade_profile}
+{cbse_block}
 
 Return ONLY valid JSON (no markdown):
 {{
@@ -1142,7 +1240,7 @@ Rules:
     try:
         completion = client.chat.completions.create(
             messages=[
-                {"role": "system", "content": "You are a quiz generator. Always respond with valid JSON only. No markdown."},
+                {"role": "system", "content": "You are a CBSE-aligned quiz generator. Always respond with valid JSON only. No markdown. Stay within the official CBSE/NCERT syllabus."},
                 {"role": "user", "content": prompt},
             ],
             model=OPENAI_MODEL, temperature=0.5, max_tokens=1000,

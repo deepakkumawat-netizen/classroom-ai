@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react'
+import CurriculumPicker from '../components/CurriculumPicker'
 import ChatHistory from '../components/ChatHistory'
 import UsageCounter from '../components/UsageCounter'
 
@@ -325,6 +326,18 @@ export default function QuizGenerator() {
       </p>
 
       <div style={{ background: 'var(--surface)', border: '1.5px solid var(--border)', borderRadius: 16, padding: 28, display: 'flex', flexDirection: 'column', gap: 20 }}>
+
+        {/* CBSE Curriculum Picker (Grade → Subject → Chapter) */}
+        <CurriculumPicker
+          grade={grade}
+          subject={subject}
+          topic={topic}
+          onChange={({ grade: g, subject: s, topic: t }) => {
+            if (g) setGrade(g)
+            if (s) setSubject(s)
+            if (t) setTopic(t)
+          }}
+        />
 
         {/* Topic */}
         <div>

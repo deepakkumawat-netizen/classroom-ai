@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react'
 import OutputBox from '../components/OutputBox'
+import CurriculumPicker from '../components/CurriculumPicker'
 import ChatHistory from '../components/ChatHistory'
 import UsageCounter from '../components/UsageCounter'
 import ErrorToast from '../components/ErrorToast'
@@ -519,6 +520,18 @@ export default function AutoGenerator() {
         <h2 style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)', marginBottom: 20 }}>
           Configure Your Materials
         </h2>
+
+        {/* CBSE Curriculum Picker (Grade → Subject → Chapter) */}
+        <CurriculumPicker
+          grade={form.grade_level}
+          subject={form.subject}
+          topic={form.topic}
+          onChange={({ grade, subject, topic }) => {
+            setForm(f => ({ ...f, grade_level: grade, subject, topic }))
+            setErrors(e => ({ ...e, grade_level: '', subject: '', topic: '' }))
+            if (topic) setTopicSource('dropdown')
+          }}
+        />
 
         {/* Grade + Subject */}
         <div className="grid-2" style={{ marginBottom: 16 }}>
