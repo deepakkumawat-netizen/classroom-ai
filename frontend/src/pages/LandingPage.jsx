@@ -81,25 +81,36 @@ export default function LandingPage() {
       </header>
 
       {/* Hero */}
-      <section style={{ textAlign: 'center', padding: '64px 6vw 40px', maxWidth: 880, margin: '0 auto' }}>
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '6px 14px', borderRadius: 100, background: 'var(--accent-soft)', color: 'var(--accent)', fontWeight: 700, fontSize: 13, marginBottom: 22 }}>
-          <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--accent)' }} /> CBSE-aligned · Grades 1–12
+      <section style={{ padding: '64px 6vw 40px', maxWidth: 1120, margin: '0 auto', display: 'flex', alignItems: 'center', gap: 40, flexWrap: 'wrap' }}>
+        <div style={{ flex: '1 1 400px', minWidth: 280 }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '6px 14px', borderRadius: 100, background: 'var(--accent-soft)', color: 'var(--accent)', fontWeight: 700, fontSize: 13, marginBottom: 22 }}>
+            <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--accent)' }} /> CBSE-aligned · Grades 1–12
+          </div>
+          <h1 style={{ fontSize: 'clamp(34px, 5vw, 56px)', fontWeight: 800, lineHeight: 1.1, margin: '0 0 18px', letterSpacing: '-0.03em' }}>
+            Plan, create &amp; assess<br /><span style={{ color: 'var(--accent)' }}>in seconds</span>, not hours.
+          </h1>
+          <p style={{ fontSize: 'clamp(15px, 2vw, 19px)', color: 'var(--text-2)', maxWidth: 560, margin: '0 0 30px', lineHeight: 1.6 }}>
+            ClassroomAI gives teachers an instant set of worksheets, lesson plans, quizzes and assessments — every one calibrated to your grade and grounded in the official CBSE curriculum.
+          </p>
+          <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
+            <button onClick={() => setAuthMode('signup')}
+              style={{ padding: '14px 30px', borderRadius: 12, border: 'none', background: 'var(--accent)', color: '#fff', fontWeight: 700, fontSize: 16, cursor: 'pointer', boxShadow: 'var(--shadow-lg)' }}>
+              Get Started Free →
+            </button>
+            <button onClick={() => navigate('/auto-generate')}
+              style={{ padding: '14px 30px', borderRadius: 12, border: '1.5px solid var(--border)', background: 'var(--surface)', color: 'var(--text-1)', fontWeight: 700, fontSize: 16, cursor: 'pointer' }}>
+              ⚡ Try Auto-Generate
+            </button>
+          </div>
         </div>
-        <h1 style={{ fontSize: 'clamp(34px, 5vw, 56px)', fontWeight: 800, lineHeight: 1.1, margin: '0 0 18px', letterSpacing: '-0.03em' }}>
-          Plan, create &amp; assess<br /><span style={{ color: 'var(--accent)' }}>in seconds</span>, not hours.
-        </h1>
-        <p style={{ fontSize: 'clamp(15px, 2vw, 19px)', color: 'var(--text-2)', maxWidth: 620, margin: '0 auto 30px', lineHeight: 1.6 }}>
-          ClassroomAI gives teachers an instant set of worksheets, lesson plans, quizzes and assessments — every one calibrated to your grade and grounded in the official CBSE curriculum.
-        </p>
-        <div style={{ display: 'flex', gap: 14, justifyContent: 'center', flexWrap: 'wrap' }}>
-          <button onClick={() => setAuthMode('signup')}
-            style={{ padding: '14px 30px', borderRadius: 12, border: 'none', background: 'var(--accent)', color: '#fff', fontWeight: 700, fontSize: 16, cursor: 'pointer', boxShadow: 'var(--shadow-lg)' }}>
-            Get Started Free →
-          </button>
-          <button onClick={() => navigate('/auto-generate')}
-            style={{ padding: '14px 30px', borderRadius: 12, border: '1.5px solid var(--border)', background: 'var(--surface)', color: 'var(--text-1)', fontWeight: 700, fontSize: 16, cursor: 'pointer' }}>
-            ⚡ Try Auto-Generate
-          </button>
+        <div style={{ flex: '1 1 320px', minWidth: 260, display: 'flex', justifyContent: 'center' }}>
+          <img
+            src="https://image.pollinations.ai/prompt/3D%20Pixar%20cartoon%20illustration%20of%20a%20friendly%20teacher%20at%20a%20desk%20with%20multiple%20worksheets%2C%20lesson%20plans%20and%20quizzes%20floating%20around%20them%2C%20chalkboard%20in%20background%2C%20bright%20vibrant%20colors%2C%20clean%20white%20background?width=768&height=768&seed=33&nologo=true"
+            alt="Teacher creating worksheets and lesson plans"
+            loading="lazy"
+            onError={(e) => { e.currentTarget.style.display = 'none'; }}
+            style={{ width: '100%', maxWidth: 440, height: 'auto', borderRadius: 20, boxShadow: 'var(--shadow-lg)' }}
+          />
         </div>
       </section>
 
