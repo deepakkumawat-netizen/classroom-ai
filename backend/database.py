@@ -156,6 +156,19 @@ class ChatDatabase:
 
         return chat_id
 
+    def update_chat_content(self, chat_id: int, content: str) -> bool:
+        """Persist an edited chat's full content + preview to SQLite."""
+        conn = sqlite3.connect(self.db_path)
+        c = conn.cursor()
+        c.execute(
+            'UPDATE chat_history SET response_content = ?, response_preview = ? WHERE id = ?',
+            (content, (content or '')[:200], chat_id),
+        )
+        conn.commit()
+        updated = c.rowcount
+        conn.close()
+        return updated > 0
+
     def get_last_7_chats(self, teacher_id: str) -> list:
         """Get last 7 chats for a teacher"""
         conn = sqlite3.connect(self.db_path)

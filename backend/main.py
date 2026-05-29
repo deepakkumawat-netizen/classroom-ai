@@ -888,6 +888,25 @@ async def increment_usage_endpoint(request: UsageIncrementRequest):
         print(f"❌ Error incrementing usage: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+class UpdateChatRequest(BaseModel):
+    chat_id: int
+    content: str
+
+@app.post("/api/update-chat")
+async def update_chat_endpoint(request: UpdateChatRequest):
+    """Persist teacher edits to a saved chat in SQLite."""
+    try:
+        ok = db.update_chat_content(request.chat_id, request.content)
+        if not ok:
+            raise HTTPException(status_code=404, detail="Chat not found")
+        return {"success": True, "chat_id": request.chat_id}
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error updating chat: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.post("/api/save-chat")
 async def save_chat_endpoint(request: SaveChatRequest):
     """Save a chat to history"""
