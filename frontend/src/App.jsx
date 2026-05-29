@@ -12,7 +12,13 @@ import TeacherInsights from './pages/TeacherInsights'
 import QuizGenerator from './pages/QuizGenerator'
 import HistoryPage from './pages/HistoryPage'
 
+const isLoggedIn = () => {
+  try { return !!JSON.parse(localStorage.getItem('classroomai_user') || 'null') }
+  catch { return false }
+}
+
 function AppLayout() {
+  if (!isLoggedIn()) return <Navigate to="/" replace />
   return (
     <div className="app-shell">
       <Sidebar />
