@@ -336,6 +336,7 @@ export default function WorksheetGenerator() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           teacher_id: TEACHER_ID,
+          session_id: localStorage.getItem('classroomai_session_id') || null,
           tool_name: 'worksheet',
           topic: form.topic,
           grade_level: form.grade_level,

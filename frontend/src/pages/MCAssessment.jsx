@@ -263,6 +263,7 @@ export default function MCAssessment() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             teacher_id: TEACHER_ID,
+            session_id: localStorage.getItem('classroomai_session_id') || null,
             tool_name: 'assessment',
             topic: form.topic,
             grade_level: form.grade_level,

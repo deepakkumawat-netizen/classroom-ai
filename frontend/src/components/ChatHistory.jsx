@@ -4,10 +4,33 @@ import HistoryViewer from './HistoryViewer';
 
 const API = window.location.hostname === 'localhost' ? 'http://localhost:8001' : window.location.origin
 
+const todayIso = () => new Date().toISOString().slice(0, 10)
+const daysAgoIso = (n) => { const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10); }
+const fmt = (s) => {
+  if (!s) return ''
+  const d = new Date(s.includes('Z') || s.includes('T') ? s : s.replace(' ', 'T') + 'Z')
+  return isNaN(d.getTime()) ? s : d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+}
+
 const ChatHistory = ({ teacherId, isOpen, onClose, onSelectChat }) => {
   const [chats, setChats] = useState([]);
+  const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [activeChat, setActiveChat] = useState(null);
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [sessionId, setSessionId] = useState('');
+
+  const fetchSessions = async () => {
+    try {
+      const res = await fetch(`${API}/api/chat-sessions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ teacher_id: teacherId }),
+      })
+      if (res.ok) { const d = await res.json(); setSessions(d.sessions || []) }
+    } catch (_) {}
+  };
 
   const fetchChatHistory = async () => {
     try {
@@ -15,7 +38,13 @@ const ChatHistory = ({ teacherId, isOpen, onClose, onSelectChat }) => {
       const response = await fetch(`${API}/api/chat-history`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ teacher_id: teacherId })
+        body: JSON.stringify({
+          teacher_id: teacherId,
+          date_from: dateFrom || null,
+          date_to: dateTo || null,
+          session_id: sessionId || null,
+          limit: 100,
+        })
       });
       if (response.ok) {
         const data = await response.json();
@@ -28,9 +57,20 @@ const ChatHistory = ({ teacherId, isOpen, onClose, onSelectChat }) => {
     }
   };
 
-  useEffect(() => {
-    if (isOpen) fetchChatHistory();
+  useEffect(() => { if (isOpen) { fetchSessions(); fetchChatHistory() }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, teacherId]);
+  useEffect(() => { if (isOpen) fetchChatHistory()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dateFrom, dateTo, sessionId]);
+
+  const setPreset = (p) => {
+    const t = todayIso()
+    if (p === 'today')      { setDateFrom(t);             setDateTo(t) }
+    else if (p === 'week')  { setDateFrom(daysAgoIso(7)); setDateTo(t) }
+    else if (p === 'month') { setDateFrom(daysAgoIso(30));setDateTo(t) }
+    else                    { setDateFrom('');            setDateTo('') }
+  };
 
   const formatDate = (dateString) => {
     const date = new Date(dateString);
@@ -114,6 +154,36 @@ const ChatHistory = ({ teacherId, isOpen, onClose, onSelectChat }) => {
           <h3>📋 Recent Chats</h3>
           <button className="close-btn" onClick={onClose}>✕</button>
         </div>
+
+        {/* Filter bar */}
+        <div style={{ padding: '10px 12px', borderBottom: '1.5px solid var(--border)', background: 'var(--surface)', display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            <button onClick={() => setPreset('today')} style={presetBtn}>Today</button>
+            <button onClick={() => setPreset('week')}  style={presetBtn}>7d</button>
+            <button onClick={() => setPreset('month')} style={presetBtn}>30d</button>
+            <button onClick={() => setPreset('all')}   style={presetBtn}>All</button>
+          </div>
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+            <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} style={dateInput} title="From" />
+            <span style={{ fontSize: 11, color: 'var(--text-3)' }}>→</span>
+            <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} style={dateInput} title="To" />
+          </div>
+          <select value={sessionId} onChange={e => setSessionId(e.target.value)} style={{ ...dateInput, width: '100%' }}>
+            <option value="">All sessions</option>
+            {sessions.map((s, i) => (
+              <option key={s.session_id || i} value={s.session_id}>
+                {fmt(s.first_at)} · {s.count} item{s.count === 1 ? '' : 's'}
+              </option>
+            ))}
+          </select>
+          {(dateFrom || dateTo || sessionId) && (
+            <button onClick={() => { setDateFrom(''); setDateTo(''); setSessionId('') }}
+              style={{ ...presetBtn, color: '#ef4444', borderColor: '#fecaca', alignSelf: 'flex-start' }}>
+              Clear filters
+            </button>
+          )}
+        </div>
+
         <div className="chat-history-content">
           {loading ? (
             <div className="loading">Loading chats...</div>
@@ -167,5 +237,16 @@ const ChatHistory = ({ teacherId, isOpen, onClose, onSelectChat }) => {
     </>
   );
 };
+
+const presetBtn = {
+  padding: '4px 10px', fontSize: 11, fontWeight: 700,
+  background: 'var(--bg)', color: 'var(--text-1)',
+  border: '1px solid var(--border)', borderRadius: 6, cursor: 'pointer',
+}
+const dateInput = {
+  padding: '4px 8px', fontSize: 11,
+  background: 'var(--bg)', color: 'var(--text-1)',
+  border: '1px solid var(--border)', borderRadius: 6, fontFamily: 'inherit',
+}
 
 export default ChatHistory;

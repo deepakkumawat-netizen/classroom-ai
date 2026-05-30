@@ -143,6 +143,14 @@ class PatternRequest(BaseModel):
 
 class ChatHistoryRequest(BaseModel):
     teacher_id: str
+    tool_name: str = ""
+    date_from: str | None = None
+    date_to: str | None = None
+    session_id: str | None = None
+    limit: int = 100
+
+class SessionListRequest(BaseModel):
+    teacher_id: str
 
 class UsageCheckRequest(BaseModel):
     teacher_id: str
@@ -161,6 +169,7 @@ class SaveChatRequest(BaseModel):
     request_data: dict
     response_preview: str
     response_content: str = None  # Full response content
+    session_id: str | None = None
 
 # ─── HELPERS ──────────────────────────────────────────
 
@@ -848,13 +857,30 @@ print("[STARTUP] Loading chat history & usage endpoints...")
 
 @app.post("/api/chat-history")
 async def get_chat_history_endpoint(request: ChatHistoryRequest):
-    """Get last 7 chats for a teacher"""
+    """Get chat history with optional date / session filters."""
     try:
-        result = get_chat_history(request.teacher_id)
-        return result
+        chats = db.get_history(
+            request.teacher_id,
+            tool_name=request.tool_name,
+            date_from=request.date_from,
+            date_to=request.date_to,
+            session_id=request.session_id,
+            limit=request.limit,
+        )
+        return {"teacher_id": request.teacher_id, "chats": chats, "count": len(chats), "success": True}
     except Exception as e:
         print(f"❌ Error getting chat history: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/chat-sessions")
+async def list_chat_sessions(request: SessionListRequest):
+    """List distinct login sessions for the session-filter dropdown."""
+    try:
+        sessions = db.list_sessions(request.teacher_id)
+        return {"teacher_id": request.teacher_id, "sessions": sessions, "success": True}
+    except Exception as e:
+        print(f"❌ Error listing chat sessions: {e}")
+        return {"sessions": [], "success": False, "error": str(e)}
 
 @app.post("/api/check-usage")
 async def check_usage_endpoint(request: UsageCheckRequest):
@@ -919,7 +945,8 @@ async def save_chat_endpoint(request: SaveChatRequest):
             request.subject,
             request.request_data,
             request.response_preview,
-            request.response_content
+            request.response_content,
+            session_id=request.session_id,
         )
 
         return {

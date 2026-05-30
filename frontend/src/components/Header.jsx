@@ -20,6 +20,7 @@ function ProfileMenu() {
   const initial = (user.name || user.email || 'T').charAt(0).toUpperCase()
   const signOut = () => {
     localStorage.removeItem('classroomai_user')
+    localStorage.removeItem('classroomai_session_id')
     navigate('/')
   }
   return (

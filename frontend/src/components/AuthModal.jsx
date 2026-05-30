@@ -32,6 +32,12 @@ export default function AuthModal({ mode = 'signup', onClose, onSwitch }) {
 
   const set = (k) => (e) => setForm(p => ({ ...p, [k]: e.target.value }))
 
+  // Mint a fresh session_id on every login/signup so history groups by login.
+  const mintSession = () => {
+    const sid = 'sess_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8)
+    localStorage.setItem('classroomai_session_id', sid)
+  }
+
   const submit = (e) => {
     e.preventDefault()
     setError('')
@@ -41,6 +47,7 @@ export default function AuthModal({ mode = 'signup', onClose, onSwitch }) {
       localStorage.setItem('classroomai_user', JSON.stringify({
         name: form.name, school: form.school, email: form.email, password: btoa(form.password),
       }))
+      mintSession()
       onClose?.(); navigate('/dashboard')
     } else {
       const stored = JSON.parse(localStorage.getItem('classroomai_user') || 'null')
@@ -49,6 +56,7 @@ export default function AuthModal({ mode = 'signup', onClose, onSwitch }) {
         || (form.email.trim().toLowerCase() === (stored.name || '').toLowerCase())
       if (!idMatch) { setError('Account not found. Check your email/name.'); return }
       if (stored.password && atob(stored.password) !== form.password) { setError('Wrong password.'); return }
+      mintSession()
       onClose?.(); navigate('/dashboard')
     }
   }
