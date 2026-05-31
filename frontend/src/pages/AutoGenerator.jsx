@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react'
 import OutputBox from '../components/OutputBox'
-import CurriculumPicker from '../components/CurriculumPicker'
+import SubjectSelector from '../components/SubjectSelector'
 import ChatHistory from '../components/ChatHistory'
 import UsageCounter from '../components/UsageCounter'
 import ErrorToast from '../components/ErrorToast'
@@ -352,7 +352,6 @@ export default function AutoGenerator() {
   const generate = async () => {
     if (!validate()) return
     setLoading(true)
-    setResults({ worksheet: '', lesson_plan: '', mc_assessment: '', quiz: '' })
     setTimeTaken(null)
     const start = Date.now()
 
@@ -417,10 +416,10 @@ export default function AutoGenerator() {
       } catch {}
 
       const newResults = {
-        worksheet:     data.worksheet,
-        lesson_plan:   data.lesson_plan,
-        mc_assessment: data.mc_assessment,
-        quiz:          quizText,
+        worksheet:     data.worksheet     || '',
+        lesson_plan:   data.lesson_plan   || '',
+        mc_assessment: data.mc_assessment || '',
+        quiz:          quizText           || '',
       }
       setResults(newResults)
 
@@ -431,7 +430,11 @@ export default function AutoGenerator() {
 
       const elapsed = ((Date.now() - start) / 1000).toFixed(1)
       setTimeTaken(elapsed)
-      setActiveTab('lesson_plan')
+      // Default to lesson_plan if it has content, otherwise the first
+      // non-empty section, so the output box is never blank after success.
+      const firstFilled = ['lesson_plan', 'worksheet', 'mc_assessment', 'quiz']
+        .find(k => newResults[k] && newResults[k].trim()) || 'lesson_plan'
+      setActiveTab(firstFilled)
 
       // Save to localStorage for Dashboard preview
       const saved = JSON.parse(localStorage.getItem('classroom-auto-history') || '[]')
@@ -522,45 +525,27 @@ export default function AutoGenerator() {
           Configure Your Materials
         </h2>
 
-        {/* CBSE Curriculum Picker (Grade → Subject → Chapter) */}
-        <CurriculumPicker
+        {/* Unified Curriculum + Subject picker. */}
+        <SubjectSelector
           grade={form.grade_level}
           subject={form.subject}
           topic={form.topic}
-          onChange={({ grade, subject, topic }) => {
-            setForm(f => ({ ...f, grade_level: grade, subject, topic }))
+          customSubject={form.custom_subject || ''}
+          onChange={({ grade, subject, topic, customSubject }) => {
+            setForm(f => ({
+              ...f,
+              grade_level: grade,
+              subject: (customSubject || '').trim() || subject,
+              custom_subject: customSubject,
+              topic,
+            }))
             setErrors(e => ({ ...e, grade_level: '', subject: '', topic: '' }))
             if (topic) setTopicSource('dropdown')
           }}
         />
-
-        {/* Grade + Subject */}
-        <div className="grid-2" style={{ marginBottom: 16 }}>
-          <div className="form-group">
-            <label className="form-label">Grade Level *</label>
-            <select
-              className="form-select"
-              value={form.grade_level}
-              onChange={e => set('grade_level', e.target.value)}
-            >
-              <option value="">Select grade...</option>
-              {GRADES.map(g => <option key={g} value={g}>{g}</option>)}
-            </select>
-            {errors.grade_level && <span style={{ color: '#ef4444', fontSize: 12 }}>{errors.grade_level}</span>}
-          </div>
-          <div className="form-group">
-            <label className="form-label">Subject *</label>
-            <select
-              className="form-select"
-              value={form.subject}
-              onChange={e => set('subject', e.target.value)}
-            >
-              <option value="">Select subject...</option>
-              {SUBJECTS.map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
-            {errors.subject && <span style={{ color: '#ef4444', fontSize: 12 }}>{errors.subject}</span>}
-          </div>
-        </div>
+        {(errors.subject || errors.grade_level) && (
+          <span style={{ color: '#ef4444', fontSize: 12 }}>{errors.subject || errors.grade_level}</span>
+        )}
 
         {/* Topic */}
         <div className="form-group" style={{ marginBottom: 20 }}>

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react'
-import CurriculumPicker from '../components/CurriculumPicker'
+import SubjectSelector from '../components/SubjectSelector'
 import ChatHistory from '../components/ChatHistory'
 import UsageCounter from '../components/UsageCounter'
 
@@ -176,6 +176,7 @@ export default function QuizGenerator() {
   const [topic, setTopic]           = useState('')
   const [grade, setGrade]           = useState('Grade 8')
   const [subject, setSubject]       = useState('Science')
+  const [customSubject, setCustomSubject] = useState('')
   const [numQ, setNumQ]             = useState(5)
   const [difficulty, setDifficulty] = useState('medium')
   const [loading, setLoading]       = useState(false)
@@ -328,14 +329,18 @@ export default function QuizGenerator() {
 
       <div style={{ background: 'var(--surface)', border: '1.5px solid var(--border)', borderRadius: 16, padding: 28, display: 'flex', flexDirection: 'column', gap: 20 }}>
 
-        {/* CBSE Curriculum Picker (Grade → Subject → Chapter) */}
-        <CurriculumPicker
+        {/* Unified Curriculum + Subject picker (replaces both duplicate dropdowns). */}
+        <SubjectSelector
           grade={grade}
           subject={subject}
           topic={topic}
-          onChange={({ grade: g, subject: s, topic: t }) => {
+          customSubject={customSubject}
+          onChange={({ grade: g, subject: s, topic: t, customSubject: cs }) => {
             if (g) setGrade(g)
-            if (s) setSubject(s)
+            // Custom-typed subject overrides the dropdown.
+            const effective = (cs || '').trim() || s
+            if (effective) setSubject(effective)
+            setCustomSubject(cs || '')
             if (t) setTopic(t)
           }}
         />
@@ -353,18 +358,6 @@ export default function QuizGenerator() {
               onFocus={e => e.target.style.borderColor = 'var(--accent)'}
               onBlur={e => e.target.style.borderColor = 'var(--border)'}/>
             <VoiceBtn onResult={setTopic} />
-          </div>
-        </div>
-
-        {/* Grade + Subject */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-          <div>
-            <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-2)', textTransform: 'uppercase', letterSpacing: 1, display: 'block', marginBottom: 8 }}>Grade Level</label>
-            <SelectDown value={grade} onChange={setGrade} options={grades} />
-          </div>
-          <div>
-            <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-2)', textTransform: 'uppercase', letterSpacing: 1, display: 'block', marginBottom: 8 }}>Subject</label>
-            <SelectDown value={subject} onChange={setSubject} options={subjects} />
           </div>
         </div>
 

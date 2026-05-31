@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react'
 import OutputBox from '../components/OutputBox'
 import CustomSelect from '../components/CustomSelect'
-import CurriculumPicker from '../components/CurriculumPicker'
+import SubjectSelector from '../components/SubjectSelector'
 import ChatHistory from '../components/ChatHistory'
 import UsageCounter from '../components/UsageCounter'
 import ErrorToast from '../components/ErrorToast'
@@ -296,7 +296,7 @@ export default function WorksheetGenerator() {
       console.log('Adaptive difficulty not available')
     }
 
-    setLoading(true); saveResult('')
+    setLoading(true)
     try {
       const res  = await fetch(`${API}/api/worksheet`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -308,7 +308,9 @@ export default function WorksheetGenerator() {
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.detail || 'Error')
-      saveResult(data.result)
+      const out = data.result || data.worksheet || data.content || ''
+      if (!out) throw new Error('Empty response from server')
+      saveResult(out)
 
       // Refresh usage counter immediately
       if (usageCounterRef.current) {
@@ -388,41 +390,26 @@ export default function WorksheetGenerator() {
         <div style={FORM_BODY}>
           <div style={{ height: 8 }}/>
 
-          {/* CBSE Curriculum Picker (Grade → Subject → Chapter) */}
-          <CurriculumPicker
+          {/* Unified Curriculum + Subject picker (CBSE / Other toggle, single
+              source of truth for grade + subject + chapter + custom subject). */}
+          <SubjectSelector
             grade={form.grade_level}
             subject={form.subject}
             topic={form.topic}
-            compact
-            onChange={({ grade, subject, topic }) => {
-              setForm(f => ({ ...f, grade_level: grade, subject, topic }))
+            customSubject={form.custom_subject || ''}
+            onChange={({ grade, subject, topic, customSubject }) => {
+              setForm(f => ({
+                ...f,
+                grade_level: grade,
+                // Custom-typed subject overrides the dropdown.
+                subject: (customSubject || '').trim() || subject,
+                custom_subject: customSubject,
+                topic,
+              }))
               setErrors(e => ({ ...e, grade_level: '', subject: '', topic: '' }))
             }}
           />
-
-          {/* STEP 1 — Subject */}
-          <div className="form-group">
-            <label className="form-label">Subject <span style={{ color: '#ef4444' }}>*</span></label>
-            <select className="form-select" value={form.subject}
-              onChange={e => { set('subject', e.target.value); set('topic', '') }}
-              style={{ borderColor: fieldBorder(errors.subject) }}>
-              <option value="">— Select Subject —</option>
-              {subjects.map(s => <option key={s}>{s}</option>)}
-            </select>
-            <ErrMsg msg={errors.subject} />
-          </div>
-
-          {/* STEP 2 — Grade */}
-          <div className="form-group">
-            <label className="form-label">Grade Level <span style={{ color: '#ef4444' }}>*</span></label>
-            <CustomSelect value={form.grade_level}
-              onChange={e => { set('grade_level', e.target.value); set('topic', '') }}
-              style={{ borderColor: fieldBorder(errors.grade_level) }}>
-              <option value="">— Select Grade —</option>
-              {grades.map(g => <option key={g}>{g}</option>)}
-            </CustomSelect>
-            <ErrMsg msg={errors.grade_level} />
-          </div>
+          <ErrMsg msg={errors.subject || errors.grade_level} />
 
           {/* STEP 3 — Topic dropdown + custom textarea */}
           <div className="form-group">

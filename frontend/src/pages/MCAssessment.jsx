@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react'
 import OutputBox from '../components/OutputBox'
 import CustomSelect from '../components/CustomSelect'
-import CurriculumPicker from '../components/CurriculumPicker'
+import SubjectSelector from '../components/SubjectSelector'
 import ChatHistory from '../components/ChatHistory'
 import UsageCounter from '../components/UsageCounter'
 import ErrorToast from '../components/ErrorToast'
@@ -221,7 +221,7 @@ export default function MCAssessment() {
 
   const generate = async () => {
     if (!validate()) return
-    setLoading(true); saveResult('')
+    setLoading(true)
 
     // Check usage limit first
     try {
@@ -249,7 +249,9 @@ export default function MCAssessment() {
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.detail || 'Error')
-      saveResult(data.result)
+      const out = data.result || data.assessment || data.content || ''
+      if (!out) throw new Error('Empty response from server')
+      saveResult(out)
 
       // Refresh usage counter immediately
       if (usageCounterRef.current) {
@@ -321,51 +323,32 @@ export default function MCAssessment() {
         <div style={FORM_BODY}>
           <div style={{ height: 8 }}/>
 
-          {/* CBSE Curriculum Picker (Grade → Subject → Chapter) */}
-          <CurriculumPicker
+          {/* Unified Curriculum + Subject picker. */}
+          <SubjectSelector
             grade={form.grade_level}
             subject={form.subject}
             topic={form.topic}
-            compact
-            onChange={({ grade, subject, topic }) => {
-              setForm(f => ({ ...f, grade_level: grade, subject, topic }))
+            customSubject={form.custom_subject || ''}
+            onChange={({ grade, subject, topic, customSubject }) => {
+              setForm(f => ({
+                ...f,
+                grade_level: grade,
+                subject: (customSubject || '').trim() || subject,
+                custom_subject: customSubject,
+                topic,
+              }))
               setErrors(e => ({ ...e, grade_level: '', subject: '', topic: '' }))
             }}
           />
+          <ErrMsg msg={errors.subject || errors.grade_level} />
 
-          {/* STEP 1 — Subject */}
           <div className="form-group">
-            <label className="form-label">Subject <span style={{ color: '#ef4444' }}>*</span></label>
-            <select className="form-select" value={form.subject}
-              onChange={e => { set('subject', e.target.value); set('topic', '') }}
-              style={{ borderColor: errors.subject ? '#fca5a5' : '#bfdbfe' }}>
-              <option value="">— Select Subject —</option>
-              {subjects.map(s => <option key={s}>{s}</option>)}
+            <label className="form-label">Difficulty</label>
+            <select className="form-select" value={form.difficulty}
+              onChange={e => set('difficulty', e.target.value)}
+              style={{ borderColor: '#bfdbfe' }}>
+              {difficulties.map(d => <option key={d.value} value={d.value}>{d.label}</option>)}
             </select>
-            <ErrMsg msg={errors.subject} />
-          </div>
-
-
-          {/* STEP 2 — Grade + Difficulty */}
-          <div className="grid-2">
-            <div className="form-group">
-              <label className="form-label">Grade Level <span style={{ color: '#ef4444' }}>*</span></label>
-              <CustomSelect value={form.grade_level}
-                onChange={e => { set('grade_level', e.target.value); set('topic', '') }}
-                style={{ borderColor: errors.grade_level ? '#fca5a5' : '#bfdbfe' }}>
-                <option value="">— Select —</option>
-                {grades.map(g => <option key={g}>{g}</option>)}
-              </CustomSelect>
-              <ErrMsg msg={errors.grade_level} />
-            </div>
-            <div className="form-group">
-              <label className="form-label">Difficulty</label>
-              <select className="form-select" value={form.difficulty}
-                onChange={e => set('difficulty', e.target.value)}
-                style={{ borderColor: '#bfdbfe' }}>
-                {difficulties.map(d => <option key={d.value} value={d.value}>{d.label}</option>)}
-              </select>
-            </div>
           </div>
 
           <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 8, padding: '7px 12px', fontSize: '0.78rem', color: '#1d7fe0', fontWeight: 500 }}>
