@@ -537,18 +537,23 @@ export default function WorksheetGenerator() {
         </div>
       </div>
 
-      {/* ── RIGHT PANEL ── */}
+      {/* ── RIGHT PANEL ── OutputBox first so generated content is visible
+           immediately. Adaptive widgets sit below and only show when no
+           result yet (so they don't push the worksheet off-screen). */}
       <div style={{ height: PAGE_H, display: 'flex', flexDirection: 'column', overflow: 'auto' }} className="fade-up-1">
-        {/* Adaptive Learning Components */}
-        <div style={{ padding: '0 0 16px 0' }}>
-          <AdaptiveProgressTracker studentId={STUDENT_ID} teacherId={TEACHER_ID} />
-          <RecommendationPanel studentId={STUDENT_ID} teacherId={TEACHER_ID} />
+        <div style={{ flex: result || loading ? 1 : 'none', minHeight: result || loading ? 0 : 'auto' }}>
+          <OutputBox result={result} loading={loading} toolName="worksheet" onClear={clearResult}
+            icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>}
+          />
         </div>
 
-        {/* Output Box */}
-        <OutputBox result={result} loading={loading} toolName="worksheet" onClear={clearResult}
-          icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>}
-        />
+        {/* Adaptive widgets only when there's no output yet. */}
+        {!result && !loading && (
+          <div style={{ padding: '16px 0 0' }}>
+            <AdaptiveProgressTracker studentId={STUDENT_ID} teacherId={TEACHER_ID} />
+            <RecommendationPanel studentId={STUDENT_ID} teacherId={TEACHER_ID} />
+          </div>
+        )}
       </div>
 
       {/* Chat History Sidebar */}

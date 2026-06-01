@@ -113,23 +113,16 @@ export default function SubjectSelector({
   const subjectOptions = mode === 'cbse' ? cbseSubjects : GENERIC_SUBJECTS
 
   return (
-    <div style={{ background: 'var(--accent-soft)', border: '1.5px solid var(--accent-mid)', borderRadius: 12, padding: 14, marginBottom: 16 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-        <span style={{ fontSize: 18 }}>📚</span>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-1)' }}>Choose your curriculum</div>
-          <div style={{ fontSize: 12, color: 'var(--text-3)' }}>
-            CBSE pulls subjects + chapters from the official Grade-wise TOC. Other shows the generic subject list.
-          </div>
+    <div style={{ background: 'var(--accent-soft)', border: '1.5px solid var(--accent-mid)', borderRadius: 10, padding: 10, marginBottom: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+        <button type="button" onClick={() => handleMode('cbse')}  style={PILL(mode === 'cbse')}>🇮🇳 CBSE</button>
+        <button type="button" onClick={() => handleMode('other')} style={PILL(mode === 'other')}>🌍 Other</button>
+        <div style={{ flex: 1, fontSize: 11, color: 'var(--text-3)', textAlign: 'right' }}>
+          {mode === 'cbse' ? 'CBSE Grade-wise TOC' : 'Generic subject list'}
         </div>
       </div>
 
-      <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
-        <button type="button" onClick={() => handleMode('cbse')}  style={PILL(mode === 'cbse')}>🇮🇳 CBSE</button>
-        <button type="button" onClick={() => handleMode('other')} style={PILL(mode === 'other')}>🌍 Other</button>
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: mode === 'cbse' ? 'repeat(3, 1fr)' : 'repeat(2, 1fr)', gap: 12 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: mode === 'cbse' ? 'repeat(3, 1fr)' : 'repeat(2, 1fr)', gap: 10 }}>
         <div>
           <label style={LABEL}>Grade</label>
           <CustomSelect value={grade} onChange={handleGrade} placeholder="Select Grade">
@@ -167,21 +160,18 @@ export default function SubjectSelector({
         )}
       </div>
 
-      <div style={{ marginTop: 12 }}>
-        <label style={LABEL}>Or type a custom subject (overrides the dropdown when filled)</label>
-        <input
-          type="text"
-          value={customSubject}
-          onChange={handleCustom}
-          placeholder="e.g. Astronomy, Marine Biology, Robotics…"
-          style={{
-            width: '100%', padding: '8px 12px', borderRadius: 8,
-            border: '1.5px solid var(--border)', background: 'var(--surface)',
-            color: 'var(--text-1)', fontSize: '0.875rem', fontFamily: 'var(--font)',
-            outline: 'none', boxSizing: 'border-box',
-          }}
-        />
-      </div>
+      <input
+        type="text"
+        value={customSubject}
+        onChange={handleCustom}
+        placeholder="Or type a custom subject (overrides dropdown when filled)…"
+        style={{
+          width: '100%', marginTop: 10, padding: '7px 12px', borderRadius: 8,
+          border: '1.5px solid var(--border)', background: 'var(--surface)',
+          color: 'var(--text-1)', fontSize: '0.8rem', fontFamily: 'var(--font)',
+          outline: 'none', boxSizing: 'border-box',
+        }}
+      />
 
       {(grade && (subject || customSubject)) && (
         <div style={{ marginTop: 10, fontSize: 12, color: 'var(--text-2)' }}>

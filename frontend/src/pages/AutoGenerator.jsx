@@ -797,11 +797,14 @@ export default function AutoGenerator() {
         </div>
       )}
 
-      {/* ── Adaptive Learning Components ────────────────────────────────── */}
-      <div style={{ padding: '0 0 16px 0' }}>
-        <AdaptiveProgressTracker studentId={STUDENT_ID} teacherId={TEACHER_ID} />
-        <RecommendationPanel studentId={STUDENT_ID} teacherId={TEACHER_ID} />
-      </div>
+      {/* ── Adaptive Learning Components — only when no results yet, so
+           the generated content stays at the top after Generate fires. */}
+      {!hasResults && !loading && (
+        <div style={{ padding: '0 0 16px 0' }}>
+          <AdaptiveProgressTracker studentId={STUDENT_ID} teacherId={TEACHER_ID} />
+          <RecommendationPanel studentId={STUDENT_ID} teacherId={TEACHER_ID} />
+        </div>
+      )}
 
       {/* ── Output Tabs ────────────────────────────────── */}
       {hasResults && (

@@ -482,18 +482,22 @@ export default function LessonPlanGenerator() {
         </div>
       </div>
 
-      {/* ── RIGHT PANEL ── */}
+      {/* ── RIGHT PANEL ── OutputBox first so generated content is visible
+           immediately. Adaptive widgets sit below and only show when no
+           result yet (so they don't push the lesson plan off-screen). */}
       <div style={{ height: PAGE_H, display: 'flex', flexDirection: 'column', overflow: 'auto' }} className="fade-up-1">
-        {/* Adaptive Learning Components */}
-        <div style={{ padding: '0 0 16px 0' }}>
-          <AdaptiveProgressTracker studentId={STUDENT_ID} teacherId={TEACHER_ID} />
-          <RecommendationPanel studentId={STUDENT_ID} teacherId={TEACHER_ID} />
+        <div style={{ flex: result || loading ? 1 : 'none', minHeight: result || loading ? 0 : 'auto' }}>
+          <OutputBox result={result} loading={loading} toolName="lesson plan" onClear={clearResult}
+            icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>}
+          />
         </div>
 
-        {/* Output Box */}
-        <OutputBox result={result} loading={loading} toolName="lesson plan" onClear={clearResult}
-          icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>}
-        />
+        {!result && !loading && (
+          <div style={{ padding: '16px 0 0' }}>
+            <AdaptiveProgressTracker studentId={STUDENT_ID} teacherId={TEACHER_ID} />
+            <RecommendationPanel studentId={STUDENT_ID} teacherId={TEACHER_ID} />
+          </div>
+        )}
       </div>
     </div>
 

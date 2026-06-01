@@ -459,18 +459,20 @@ export default function MCAssessment() {
         </div>
       </div>
 
-      {/* ── RIGHT PANEL ── */}
+      {/* ── RIGHT PANEL ── OutputBox first; adaptive widgets only when empty. */}
       <div style={{ height: PAGE_H, display: 'flex', flexDirection: 'column', overflow: 'auto' }} className="fade-up-1">
-        {/* Adaptive Learning Components */}
-        <div style={{ padding: '0 0 16px 0' }}>
-          <AdaptiveProgressTracker studentId={STUDENT_ID} teacherId={TEACHER_ID} />
-          <RecommendationPanel studentId={STUDENT_ID} teacherId={TEACHER_ID} />
+        <div style={{ flex: result || loading ? 1 : 'none', minHeight: result || loading ? 0 : 'auto' }}>
+          <OutputBox result={result} loading={loading} toolName="assessment" onClear={clearResult}
+            icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>}
+          />
         </div>
 
-        {/* Output Box */}
-        <OutputBox result={result} loading={loading} toolName="assessment" onClear={clearResult}
-          icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>}
-        />
+        {!result && !loading && (
+          <div style={{ padding: '16px 0 0' }}>
+            <AdaptiveProgressTracker studentId={STUDENT_ID} teacherId={TEACHER_ID} />
+            <RecommendationPanel studentId={STUDENT_ID} teacherId={TEACHER_ID} />
+          </div>
+        )}
       </div>
     </div>
 
