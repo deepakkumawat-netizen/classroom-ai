@@ -79,10 +79,15 @@ export default function SubjectSelector({
     return () => { cancelled = true }
   }, [])
 
-  const cbseSubjects = useMemo(
-    () => (grade && tree[grade] ? Object.keys(tree[grade]) : []),
-    [tree, grade]
-  )
+  // CBSE subjects: union of subjects across ALL grades, so the teacher
+  // can pick subject before grade if they want. Chapters still need both.
+  const cbseSubjects = useMemo(() => {
+    if (grade && tree[grade]) return Object.keys(tree[grade])
+    const set = new Set()
+    Object.values(tree).forEach(g => Object.keys(g || {}).forEach(s => set.add(s)))
+    return Array.from(set).sort()
+  }, [tree, grade])
+
   const chapters = useMemo(
     () => (mode === 'cbse' && grade && subject && tree[grade]?.[subject] ? tree[grade][subject] : []),
     [mode, grade, subject, tree]
@@ -101,7 +106,13 @@ export default function SubjectSelector({
     fire({ mode: next, subject: '', topic: '', chapter: null })
   }
 
-  const handleGrade   = (e) => fire({ grade: e.target.value, subject: '', topic: '', chapter: null })
+  const handleGrade = (e) => {
+    const g = e.target.value
+    // If the current subject doesn't exist for this grade in CBSE mode,
+    // clear it. Otherwise keep what the teacher already picked.
+    const keepSubject = mode !== 'cbse' || (g && subject && tree[g]?.[subject])
+    fire({ grade: g, subject: keepSubject ? subject : '', topic: '', chapter: null })
+  }
   const handleSubject = (e) => fire({ subject: e.target.value, topic: '', chapter: null })
   const handleChapter = (e) => {
     const idx = e.target.value
@@ -132,13 +143,8 @@ export default function SubjectSelector({
         </div>
         <div>
           <label style={LABEL}>Subject</label>
-          <CustomSelect
-            value={subject}
-            onChange={handleSubject}
-            disabled={mode === 'cbse' && !grade}
-            placeholder={mode === 'cbse' && !grade ? 'Pick a grade first' : 'Select Subject'}
-          >
-            <option value="">{mode === 'cbse' && !grade ? 'Pick a grade first' : 'Select Subject'}</option>
+          <CustomSelect value={subject} onChange={handleSubject} placeholder="Select Subject">
+            <option value="">Select Subject</option>
             {subjectOptions.map(s => <option key={s} value={s}>{s}</option>)}
           </CustomSelect>
         </div>
@@ -148,10 +154,10 @@ export default function SubjectSelector({
             <CustomSelect
               value={selectedChapterIdx >= 0 ? String(selectedChapterIdx) : ''}
               onChange={handleChapter}
-              disabled={!subject}
-              placeholder={subject ? 'Select Chapter' : 'Pick a subject first'}
+              disabled={!grade || !subject}
+              placeholder={!grade ? 'Pick a grade' : (!subject ? 'Pick a subject' : 'Select Chapter')}
             >
-              <option value="">{subject ? 'Select Chapter' : 'Pick a subject first'}</option>
+              <option value="">{!grade ? 'Pick a grade' : (!subject ? 'Pick a subject' : 'Select Chapter')}</option>
               {chapters.map((ch, i) => (
                 <option key={i} value={String(i)}>{ch.ch ? `${ch.ch}. ${ch.title}` : ch.title}</option>
               ))}
