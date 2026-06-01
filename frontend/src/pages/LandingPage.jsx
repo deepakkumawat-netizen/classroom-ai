@@ -52,10 +52,20 @@ export default function LandingPage() {
   const navigate = useNavigate()
   const { isDark, toggleTheme } = useTheme()
   const [authMode, setAuthMode] = useState(null) // 'signup' | 'login' | null
-  // Rotate the hero image's Pollinations seed every 5s for fresh variations.
-  const [heroSeed, setHeroSeed] = useState(33)
+  // Hero image rotation — preload the next Pollinations seed in the
+  // background and only swap the visible src once it's fully loaded, so
+  // the user never sees a blank rectangle between rotations.
+  const buildHeroUrl = (s) => `https://image.pollinations.ai/prompt/3D%20Pixar%20cartoon%20illustration%20of%20a%20friendly%20teacher%20at%20a%20desk%20with%20multiple%20worksheets%2C%20lesson%20plans%20and%20quizzes%20floating%20around%20them%2C%20chalkboard%20in%20background%2C%20bright%20vibrant%20colors%2C%20clean%20white%20background?width=768&height=768&seed=${s}&nologo=true`
+  const [heroUrl, setHeroUrl] = useState(buildHeroUrl(33))
   useEffect(() => {
-    const t = setInterval(() => setHeroSeed(s => s + 1), 5000)
+    let seed = 33
+    const t = setInterval(() => {
+      seed += 1
+      const nextUrl = buildHeroUrl(seed)
+      const img = new Image()
+      img.onload = () => setHeroUrl(nextUrl)
+      img.src = nextUrl
+    }, 5000)
     return () => clearInterval(t)
   }, [])
 
@@ -111,12 +121,10 @@ export default function LandingPage() {
         </div>
         <div style={{ flex: '1 1 320px', minWidth: 260, display: 'flex', justifyContent: 'center' }}>
           <img
-            src={`https://image.pollinations.ai/prompt/3D%20Pixar%20cartoon%20illustration%20of%20a%20friendly%20teacher%20at%20a%20desk%20with%20multiple%20worksheets%2C%20lesson%20plans%20and%20quizzes%20floating%20around%20them%2C%20chalkboard%20in%20background%2C%20bright%20vibrant%20colors%2C%20clean%20white%20background?width=768&height=768&seed=${heroSeed}&nologo=true`}
+            src={heroUrl}
             alt="Teacher creating worksheets and lesson plans"
-            loading="lazy"
-            key={heroSeed}
             onError={(e) => { e.currentTarget.style.display = 'none'; }}
-            style={{ width: '100%', maxWidth: 440, height: 'auto', borderRadius: 20, boxShadow: 'var(--shadow-lg)', transition: 'opacity .4s' }}
+            style={{ width: '100%', maxWidth: 440, height: 'auto', aspectRatio: '1 / 1', borderRadius: 20, boxShadow: 'var(--shadow-lg)', transition: 'opacity .4s', background: 'linear-gradient(135deg, var(--accent-soft, #e3f0ff), #f7fbff)' }}
           />
         </div>
       </section>
