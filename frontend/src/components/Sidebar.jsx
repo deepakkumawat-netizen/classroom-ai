@@ -170,7 +170,7 @@ export default function Sidebar() {
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <div style={{ width: 8, height: 8, background: '#22c55e', borderRadius: '50%' }} />
-          Powered by Groq
+          Powered by Codevidhya
         </div>
       </div>
     </aside>

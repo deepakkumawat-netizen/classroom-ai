@@ -62,6 +62,11 @@ OPENAI_API_KEY = os.getenv("GROQ_API_KEY", "").strip() or "missing-set-GROQ_API_
 OPENAI_MODEL   = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
 client = OpenAI(api_key=OPENAI_API_KEY, base_url="https://api.groq.com/openai/v1")
 
+# Multi-provider chat helper: walks Groq 70B → Groq 8B → Groq Gemma →
+# Anthropic Claude on rate-limit errors. Use instead of client.chat.…
+# for non-streaming calls so a single quota hit doesn't break the tool.
+from llm_client import chat_with_fallback
+
 # ─── MODELS ───────────────────────────────────────────
 
 class WorksheetRequest(BaseModel):
@@ -235,8 +240,7 @@ def cbse_curriculum_block(topic: str, grade_level: str, subject: str = "") -> st
 
 def call_openai(system_prompt: str, user_prompt: str, max_tokens: int = 1000) -> str:
     try:
-        response = client.chat.completions.create(
-            model=OPENAI_MODEL,
+        response = chat_with_fallback(
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user",   "content": user_prompt},
@@ -1083,8 +1087,7 @@ async def generate_adaptive_question(data: dict):
         Difficulty: {suggested_difficulty} (0=easy, 1=hard)
         Include 4 multiple choice options and mark the correct answer."""
 
-        response = client.chat.completions.create(
-            model="gpt-4",
+        response = chat_with_fallback(
             messages=[
                 {"role": "system", "content": "You are an expert educator. Generate a clear, engaging educational question."},
                 {"role": "user", "content": prompt}
@@ -1284,12 +1287,12 @@ Rules:
 - Use simple language for younger grades"""
 
     try:
-        completion = client.chat.completions.create(
+        completion = chat_with_fallback(
             messages=[
                 {"role": "system", "content": "You are a CBSE-aligned quiz generator. Always respond with valid JSON only. No markdown. Stay within the official CBSE/NCERT syllabus."},
                 {"role": "user", "content": prompt},
             ],
-            model=OPENAI_MODEL, temperature=0.5, max_tokens=1000,
+            temperature=0.5, max_tokens=1000,
         )
         import re as _re
         text = completion.choices[0].message.content.strip()
