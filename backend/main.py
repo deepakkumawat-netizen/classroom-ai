@@ -212,6 +212,29 @@ def get_grade_language_profile(grade_level: str) -> str:
     return "LANGUAGE LEVEL: Use clear, age-appropriate language for the specified grade level."
 
 
+def source_material_rule(source_material: str) -> str:
+    """Single source-of-truth instruction the LLM gets every time a teacher
+    uploads a file / URL / YouTube transcript. Replaces 4 different
+    weakly-worded copies (Worksheet / Lesson Plan / MC Assessment /
+    Auto-Generator) that all said variants of 'derive questions from this
+    content' — wording too soft, so on low grades the model used to swap
+    the topic for a Grade-themed fallback (e.g. uploaded AI-tutoring file
+    + Grade 1 → got a 'My Pet' worksheet). This wording locks the topic
+    to the source and forces grade adaptation to happen in vocabulary
+    only, never by changing what the worksheet is about."""
+    if not source_material or not source_material.strip():
+        return ""
+    return (
+        "SOURCE MATERIAL IS AUTHORITATIVE — the topic of this worksheet is fixed by the "
+        "teacher's uploaded content. You MUST stay on that topic. Do NOT switch to a "
+        "Grade-themed fallback (no 'My Pet' / 'My Family' / generic-Grade-1 passages) "
+        "even when the grade is young. If the source is too advanced for the grade, "
+        "REWRITE it using grade-appropriate vocabulary — but the subject, facts, names "
+        "and examples must still come from the source. Every question must reference "
+        "what the source actually says. "
+    )
+
+
 def cbse_curriculum_block(topic: str, grade_level: str, subject: str = "") -> str:
     """Return a CBSE-grounding prompt block for the given topic / grade / subject.
 
@@ -345,7 +368,7 @@ def generate_worksheet(req: WorksheetRequest):
         "Create professional, print-ready worksheets aligned to the official CBSE / NCERT syllabus. "
         "Ensure questions are clear, unambiguous, and aligned to the specified grade level and Bloom's level. "
         f"{lang} "
-        + ("When source material is provided, derive ALL questions directly from that content. " if req.source_material.strip() else "")
+        + source_material_rule(req.source_material)
         + "Write in plain text ONLY — absolutely no markdown, no asterisks, no hashtags, no bold symbols. "
         "Use CAPITAL LETTERS for section headers and dashes for separators."
     )
@@ -487,7 +510,7 @@ def generate_lesson_plan(req: LessonPlanRequest):
         "Create detailed, actionable, classroom-ready lesson plans aligned to the official CBSE / NCERT syllabus. "
         "Include specific timing estimates, concrete student activities, and teacher facilitation notes. "
         f"{lang} "
-        + ("When source material is provided, align ALL activities and content directly to it. " if req.source_material.strip() else "")
+        + source_material_rule(req.source_material)
         + "Write in plain text ONLY — no markdown, no asterisks, no hashtags. "
         "Use numbered sections with UPPERCASE HEADERS."
     )
@@ -608,7 +631,7 @@ def generate_mc_assessment(req: MCAssessmentRequest):
         "All distractors (wrong answers) must be plausible but clearly incorrect to students who mastered the material. "
         "Avoid trick questions, double negatives, and 'all of the above' options. "
         f"{lang} "
-        + ("When source material is provided, ALL questions must come directly from that content. " if req.source_material.strip() else "")
+        + source_material_rule(req.source_material)
         + "Write in plain text ONLY — no markdown, no asterisks, no hashtags."
     )
 
@@ -667,7 +690,7 @@ def auto_generate(req: AutoGenerateRequest):
     ws_system = (
         f"You are an expert CBSE classroom teacher creating a worksheet for {req.grade_level} students aligned to the CBSE / NCERT syllabus. "
         f"{lang} "
-        + ("Base all questions on the provided source material. " if req.source_material.strip() else "")
+        + source_material_rule(req.source_material)
         + "Write in plain text ONLY — no markdown, no asterisks, no hashtags. "
         "Use CAPITAL LETTERS for section headers."
     )
