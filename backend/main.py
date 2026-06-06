@@ -404,7 +404,14 @@ def generate_worksheet(req: WorksheetRequest):
         "Write ONLY plain text. No **, ##, or any markdown whatsoever."
     )
 
-    result = call_openai(system_prompt, user_prompt)
+    # Scale max_tokens with question count — a 21-question worksheet with
+    # MC choices + answer key + rationale per question needs ~150 tokens
+    # per question. The previous default of 1000 tokens truncated the
+    # answer key after the first 2-3 questions, leaving students/teachers
+    # with an incomplete answer sheet. Floor at 2000, cap at 8000 so we
+    # don't try to ask for more than the model's per-response ceiling.
+    max_toks = max(2000, min(8000, req.num_questions * 200 + 800))
+    result = call_openai(system_prompt, user_prompt, max_tokens=max_toks)
     return {"result": result, "tool": "worksheet"}
 
 
@@ -665,7 +672,11 @@ def generate_mc_assessment(req: MCAssessmentRequest):
         "Write everything in plain text. No **, ##, or any markdown."
     )
 
-    result = call_openai(system_prompt, user_prompt, max_tokens=1800)
+    # Scale with question count — MC items + 4 distractors + answer key
+    # + rationale need ~200 tokens per question. Previous fixed 1800 was
+    # ok for 10 questions, truncated for 20+.
+    max_toks = max(1800, min(8000, req.num_questions * 200 + 800))
+    result = call_openai(system_prompt, user_prompt, max_tokens=max_toks)
     return {"result": result, "tool": "mc-assessment"}
 
 
@@ -780,10 +791,16 @@ def auto_generate(req: AutoGenerateRequest):
     )
 
     # ── Run sequentially to stay within Groq free-tier rate limits ────────────
-    topic_overview = call_openai(ov_system, ov_user, 800)
-    lesson_content = call_openai(lp_system, lp_user, 900)
-    worksheet      = call_openai(ws_system, ws_user, 800)
-    mc_assessment  = call_openai(mc_system, mc_user, 800)
+    # Scale worksheet + MC assessment with question count; topic overview
+    # and lesson content are fixed-length sections so they don't need to
+    # scale. Without this scaling, a 20-question auto-generated worksheet
+    # would truncate its answer key after a few items.
+    ws_toks = max(1500, min(8000, req.num_questions * 200 + 800))
+    mc_toks = max(1500, min(8000, req.num_questions * 200 + 800))
+    topic_overview = call_openai(ov_system, ov_user, 1000)
+    lesson_content = call_openai(lp_system, lp_user, 1500)
+    worksheet      = call_openai(ws_system, ws_user, ws_toks)
+    mc_assessment  = call_openai(mc_system, mc_user, mc_toks)
 
     # Combine overview + lesson plan (matching the Lesson Plan Generator format)
     lesson_plan = (
