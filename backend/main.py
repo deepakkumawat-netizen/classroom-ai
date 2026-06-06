@@ -261,7 +261,13 @@ def cbse_curriculum_block(topic: str, grade_level: str, subject: str = "") -> st
     )
 
 
-def call_openai(system_prompt: str, user_prompt: str, max_tokens: int = 1000) -> str:
+def call_openai(system_prompt: str, user_prompt: str, max_tokens: int = 1000, prefer_gemini: bool = True) -> str:
+    """Wrapper around chat_with_fallback. Defaults to prefer_gemini=True
+    because ClassroomAI is fundamentally a CBSE/NCERT tool — every
+    worksheet, lesson plan, MC assessment, and auto-generator output
+    needs accurate NCERT alignment, and Gemini Flash has the best baked-in
+    NCERT knowledge. Pass prefer_gemini=False for non-CBSE / utility
+    calls (e.g. JSON parsing helpers) where Claude or Groq is fine."""
     try:
         response = chat_with_fallback(
             messages=[
@@ -270,6 +276,7 @@ def call_openai(system_prompt: str, user_prompt: str, max_tokens: int = 1000) ->
             ],
             temperature=0.65,
             max_tokens=max_tokens,
+            prefer_gemini=prefer_gemini,
         )
         return response.choices[0].message.content.strip()
     except Exception as e:
