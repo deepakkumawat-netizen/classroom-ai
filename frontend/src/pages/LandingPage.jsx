@@ -155,7 +155,7 @@ export default function LandingPage() {
           <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--success)' }} />
           Powered by Codevidhya
         </div>
-        <div style={{ marginTop: 6 }}>© 2025 ClassroomAI — CBSE-aligned teaching tools.</div>
+        <div style={{ marginTop: 6 }}>© 2026 ClassroomAI — CBSE-aligned teaching tools.</div>
       </footer>
 
       {authMode && (
