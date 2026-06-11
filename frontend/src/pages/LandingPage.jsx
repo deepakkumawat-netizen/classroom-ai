@@ -151,9 +151,8 @@ export default function LandingPage() {
 
       {/* Footer */}
       <footer style={{ borderTop: '1.5px solid var(--border)', padding: '24px 6vw', textAlign: 'center', color: 'var(--text-3)', fontSize: 13 }}>
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--success)' }} />
-          Powered by Codevidhya
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '6px 16px', borderRadius: 100, background: 'rgba(20, 50, 70, 0.85)', color: '#fff', fontSize: 11, fontWeight: 700, letterSpacing: '1.5px', textTransform: 'uppercase' }}>
+          ✦ Powered by Codevidhya
         </div>
         <div style={{ marginTop: 6 }}>© 2026 ClassroomAI — CBSE-aligned teaching tools.</div>
       </footer>

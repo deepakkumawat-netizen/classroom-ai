@@ -168,9 +168,8 @@ export default function Sidebar() {
         color: 'var(--text-3)',
         fontWeight: 500,
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <div style={{ width: 8, height: 8, background: '#22c55e', borderRadius: '50%' }} />
-          Powered by Codevidhya
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '6px 14px', borderRadius: 100, background: 'rgba(20, 50, 70, 0.85)', color: '#fff', fontSize: 10, fontWeight: 700, letterSpacing: '1.5px', textTransform: 'uppercase' }}>
+          ✦ Powered by Codevidhya
         </div>
       </div>
     </aside>
